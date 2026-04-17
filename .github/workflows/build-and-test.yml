@@ -28,7 +28,7 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx"
+        run: dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx" --collect:"XPlat Code Coverage"
 
       - name: Generate test summary
         if: always()
@@ -62,6 +62,39 @@ jobs:
                   failed = int(counters.get('failed', 0))
                   badge  = '✅' if failed == 0 else '❌'
                   lines.append(f'| {project} | {total} | {badge} |\n')
+
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
+          with open(summary_path, 'a') as f:
+              f.writelines(lines)
+          EOF
+
+      - name: Generate coverage summary
+        if: always()
+        run: |
+          python3 << 'EOF'
+          import xml.etree.ElementTree as ET
+          import glob
+          import os
+
+          lines = [
+              "\n## Code Coverage\n",
+              "\n",
+              "| Assembly | Line Coverage | Branch Coverage |\n",
+              "| -------- | -----------: | --------------: |\n",
+          ]
+
+          for cov_file in sorted(glob.glob('./test-results/**/coverage.cobertura.xml', recursive=True)):
+              tree = ET.parse(cov_file)
+              root = tree.getroot()
+              for pkg in root.findall('.//package'):
+                  name = pkg.get('name', 'Unknown')
+                  line_rate = float(pkg.get('line-rate', 0)) * 100
+                  branch_rate = float(pkg.get('branch-rate', 0)) * 100
+                  lines.append(f'| {name} | {line_rate:.1f}% | {branch_rate:.1f}% |\n')
+
+              total_line = float(root.get('line-rate', 0)) * 100
+              total_branch = float(root.get('branch-rate', 0)) * 100
+              lines.append(f'| **Total** | **{total_line:.1f}%** | **{total_branch:.1f}%** |\n')
 
           summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
           with open(summary_path, 'a') as f:
