@@ -28,7 +28,9 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx" --collect:"XPlat Code Coverage"
+        run: |
+          rm -rf ./test-results
+          dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx" --collect:"XPlat Code Coverage"
 
       - name: Generate test summary
         if: always()
@@ -75,57 +77,60 @@ jobs:
           import xml.etree.ElementTree as ET
           import glob
           import os
+          from collections import defaultdict
 
-          # Collect per-namespace stats across all cobertura files, deduplicating
-          namespaces = {}  # name -> (lines_covered, lines_valid, branches_covered, branches_valid)
+          # project -> namespace -> (lines_covered, lines_valid, branches_covered, branches_valid)
+          projects = defaultdict(lambda: defaultdict(lambda: (0, 0, 0, 0)))
 
           for cov_file in sorted(glob.glob('./test-results/**/coverage.cobertura.xml', recursive=True)):
               tree = ET.parse(cov_file)
               root = tree.getroot()
               for pkg in root.findall('.//package'):
+                  project = pkg.get('name', 'Unknown')
                   for cls in pkg.findall('.//class'):
                       ns = cls.get('name', 'Unknown')
-                      # Use everything up to the last dot as the namespace
                       ns = ns.rsplit('.', 1)[0] if '.' in ns else ns
+                      if not ns.startswith('JOrder.'):
+                          continue
 
-                      prev = namespaces.get(ns, (0, 0, 0, 0))
-                      lc = bv = bc = 0
-                      lv = 0
+                      prev = projects[project][ns]
+                      lc = lv = bc = bv = 0
                       for line in cls.findall('.//line'):
                           lv += 1
                           if int(line.get('hits', 0)) > 0:
                               lc += 1
                           if line.get('branch') == 'True':
                               cc = line.get('condition-coverage', '')
-                              # Format: "50% (1/2)"
                               if '(' in cc:
                                   parts = cc.split('(')[1].rstrip(')').split('/')
                                   bc += int(parts[0])
                                   bv += int(parts[1])
 
-                      namespaces[ns] = (
+                      projects[project][ns] = (
                           prev[0] + lc, prev[1] + lv,
                           prev[2] + bc, prev[3] + bv,
                       )
 
-          lines = [
-              "\n## Code Coverage\n",
-              "\n",
-              "| Namespace | Line Coverage | Branch Coverage |\n",
-              "| --------- | -----------: | --------------: |\n",
-          ]
+          def pct(n, d):
+              return f'{n / d * 100:.1f}%' if d else '—'
 
+          lines = ["\n## Code Coverage\n\n"]
           total_lc = total_lv = total_bc = total_bv = 0
-          for ns in sorted(namespaces):
-              lc, lv, bc, bv = namespaces[ns]
-              total_lc += lc; total_lv += lv; total_bc += bc; total_bv += bv
-              line_pct = (lc / lv * 100) if lv else 0
-              branch_pct = (bc / bv * 100) if bv else 0
-              lines.append(f'| {ns} | {line_pct:.1f}% | {branch_pct:.1f}% |\n')
 
-          total_line = (total_lc / total_lv * 100) if total_lv else 0
-          total_branch = (total_bc / total_bv * 100) if total_bv else 0
-          lines.append(f'| **Total** | **{total_line:.1f}%** | **{total_branch:.1f}%** |\n')
+          for project in sorted(projects):
+              lines.append(f'### {project}\n\n')
+              lines.append('| Namespace | Line | Branch |\n')
+              lines.append('| --------- | ---: | -----: |\n')
+              p_lc = p_lv = p_bc = p_bv = 0
+              for ns in sorted(projects[project]):
+                  lc, lv, bc, bv = projects[project][ns]
+                  p_lc += lc; p_lv += lv; p_bc += bc; p_bv += bv
+                  short_ns = ns.replace(f'{project}.', '') if ns.startswith(f'{project}.') else ns
+                  lines.append(f'| {short_ns} | {pct(lc, lv)} | {pct(bc, bv)} |\n')
+              lines.append(f'| **Subtotal** | **{pct(p_lc, p_lv)}** | **{pct(p_bc, p_bv)}** |\n\n')
+              total_lc += p_lc; total_lv += p_lv; total_bc += p_bc; total_bv += p_bv
+
+          lines.append(f'**Overall: {pct(total_lc, total_lv)} line · {pct(total_bc, total_bv)} branch**\n')
 
           summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
           with open(summary_path, 'a') as f:
