@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identity-config
+  namespace: jorder
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  JOrder__ServiceOptions__Name: "JOrder Identity API"
+  JOrder__ServiceOptions__Version: "1.0.0"
+  JOrder__DatabaseOptions__Provider: "npgsql"
+  Authentication__JwtSigning__PrivateKeyPath: "/app/keys/signing-key.pem"
+  Authentication__JwtSigning__Issuer: "REPLACE_ME"
+  Authentication__JwtSigning__Audience: "REPLACE_ME"
+  Authentication__JwtSigning__Algorithm: "RS256"
+  Authentication__JwtSigning__AccessTokenLifetimeMinutes: "15"
+  Authentication__JwtSigning__RefreshTokenLifetimeDays: "7"
+

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\JOrder.Common.UnitTests\JOrder.Common.UnitTests.csproj" />
+  </Folder>
+  <Project Path="src/JOrder.Common/JOrder.Common.csproj" />
+  <Project Path="src/JOrder.Identity/JOrder.Identity.csproj" />
+</Solution>

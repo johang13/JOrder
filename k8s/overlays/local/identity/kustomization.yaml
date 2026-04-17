@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: config-patch.yaml
+  - path: secret-patch.yaml
+  - path: deployment-patch.yaml
+  - path: ingress-patch.yaml
+
+images:
+  - name: jorder/identity
+    newTag: local
+

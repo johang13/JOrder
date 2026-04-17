@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity
+  namespace: jorder
+spec:
+  selector:
+    app: identity
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+

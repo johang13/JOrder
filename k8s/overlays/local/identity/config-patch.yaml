@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identity-config
+  namespace: jorder
+data:
+  Authentication__JwtSigning__Issuer: "http://identity.jorder.localhost"
+  Authentication__JwtSigning__Audience: "jorder-api"
+  ASPNETCORE_ENVIRONMENT: "Development"
+

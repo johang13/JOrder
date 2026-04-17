@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity
+  namespace: jorder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity
+  template:
+    metadata:
+      labels:
+        app: identity
+    spec:
+      containers:
+        - name: identity
+          image: jorder/identity:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: identity-config
+          env:
+            - name: JOrder__DatabaseOptions__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: identity-secret
+                  key: ConnectionStrings__Identity
+          volumeMounts:
+            - name: signing-key
+              mountPath: /app/keys
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: signing-key
+          secret:
+            secretName: identity-signing-key
+
