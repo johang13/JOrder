@@ -21,6 +21,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <response code="201">Registration succeeded and tokens were issued.</response>
     /// <response code="400">The request payload is invalid.</response>
     /// <response code="409">A user with the same email already exists.</response>
+    /// <response code="429">Too many requests in a short time window.</response>
     /// <response code="500">Unexpected server error.</response>
     [HttpPost("register")]
     [AllowAnonymous]
@@ -56,12 +57,15 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// </summary>
     /// <response code="200">Authentication succeeded and tokens were issued.</response>
     /// <response code="401">Credentials are invalid.</response>
+    /// <response code="400">The request payload is invalid.</response>
     /// <response code="500">Unexpected server error.</response>
+    /// <response code="429">Too many requests in a short time window.</response>
     [HttpPost("login")]
     [AllowAnonymous]
     [RateLimit(permitLimit: 10, windowSeconds: 60)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -87,12 +91,15 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// </summary>
     /// <response code="200">Refresh succeeded and a new token pair was issued.</response>
     /// <response code="401">Refresh token is invalid, expired, revoked, or otherwise unauthorized.</response>
+    /// <response code="400">The request payload is invalid.</response>
     /// <response code="500">Unexpected server error.</response>
+    /// <response code="429">Too many requests in a short time window.</response>
     [HttpPost("refresh")]
     [AllowAnonymous]
     [RateLimit(permitLimit: 10, windowSeconds: 60)]
     [Produces("application/json")]
     [ProducesResponseType(typeof(RefreshResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -121,11 +128,13 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// already revoked, expired, or not found.
     /// </remarks>
     /// <response code="204">Logout completed and token is no longer usable.</response>
+    /// <response code="400">The request payload is invalid.</response>
     /// <response code="500">Unexpected server error.</response>
     [HttpPost("logout")]
     [AllowAnonymous]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Logout([FromBody] LogoutRequestDto request)
     {
@@ -155,7 +164,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> LogoutAll()
     {
-        var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userIdClaim = this.GetUserIdClaim();
         if (!Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 

@@ -2,6 +2,7 @@ using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Attributes;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Auth.Results;
+using JOrder.Identity.Extensions;
 using JOrder.Identity.Models;
 using JOrder.Identity.Persistence;
 using JOrder.Identity.Services.Interfaces;
@@ -44,15 +45,16 @@ public sealed class AuthService(
             if (!createResult.Succeeded)
             {
                 logger.LogInformation("User creation failed for user: {Email}", command.Email);
-                return IdentityValidationError("auth.register.invalid", createResult, "User creation failed.");
+                return createResult.ToValidationError("auth.register.invalid", "User creation failed.");
             }
+            
             logger.LogInformation("User created: {Email}", command.Email);
 
             var roleResult = await userManager.AddToRoleAsync(user, "Customer");
             if (!roleResult.Succeeded)
             {
                 logger.LogInformation("Adding role to user failed for user: {Email}", command.Email);
-                return IdentityValidationError("auth.register.invalid", roleResult, "Adding user to role failed.");
+                return roleResult.ToValidationError("auth.register.role_assignment_failed", "Failed to assign role to user.");
             }
 
             logger.LogInformation("Assigned role 'Customer' to user: {Email}", command.Email);
@@ -197,20 +199,6 @@ public sealed class AuthService(
 
         return roles.ToArray();
     }
-
-
-    private static Error IdentityValidationError(string code, IdentityResult result, string fallback) =>
-        Error.Validation(code, FormatErrors(result, fallback));
-
-    private static string FormatErrors(IdentityResult result, string fallback = "An error occurred.")
-    {
-        var descriptions = result.Errors
-            .Select(e => e.Description)
-            .Where(d => !string.IsNullOrWhiteSpace(d))
-            .ToArray();
-
-        return descriptions.Length == 0 ? fallback : string.Join("; ", descriptions);
-    }
-
+    
     #endregion
 }

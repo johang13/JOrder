@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using JOrder.Common.Abstractions.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,5 +20,9 @@ public static class ControllerBaseExtensions
             _ => controller.Problem(detail: error.Description, statusCode: StatusCodes.Status500InternalServerError)
         };
     }
+
+    public static string? GetUserIdClaim(this ControllerBase controller) => 
+        controller.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+        controller.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 }
 

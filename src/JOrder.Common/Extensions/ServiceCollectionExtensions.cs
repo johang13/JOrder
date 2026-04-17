@@ -1,3 +1,4 @@
+using JOrder.Common.Helpers;
 using JOrder.Common.Options;
 using JOrder.Common.Options.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,6 +43,7 @@ public static class ServiceCollectionExtensions
                 document.Info.Title = title;
                 return Task.CompletedTask;
             });
+            options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
         });
         return services;
     }

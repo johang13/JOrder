@@ -1,9 +1,11 @@
+using System.Security.Cryptography;
 using JOrder.Common.Extensions;
 using JOrder.Identity.Models;
 using JOrder.Identity.Options;
 using JOrder.Identity.Persistence;
 using JOrder.Identity.Warmup;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +33,15 @@ builder.Services
     .AddIdentityCore<User>()
     .AddRoles<Role>()
     .AddEntityFrameworkStores<JOrderIdentityDbContext>();
+
+// Self-validate JWTs issued by this service (static key — no OIDC discovery needed)
+var signingConfig = builder.Configuration
+    .GetSection(JwtSigningOptions.SectionName)
+    .Get<JwtSigningOptions>()!;
+var rsa = RSA.Create();
+rsa.ImportFromPem(File.ReadAllText(signingConfig.PrivateKeyPath));
+var publicKey = new RsaSecurityKey(rsa.ExportParameters(false));
+builder.AddJOrderJwtIssuerAuthentication(signingConfig.Issuer, signingConfig.Audience, publicKey);
 
 // Build
 await using var app = builder.Build();

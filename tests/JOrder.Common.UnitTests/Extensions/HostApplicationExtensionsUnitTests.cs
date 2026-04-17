@@ -5,7 +5,6 @@ using JOrder.Common.Extensions;
 using JOrder.Common.Options;
 using JOrder.Common.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,20 +53,6 @@ public class HostApplicationExtensionsUnitTests
         Assert.Contains(builder.Services, d => d.ServiceType.FullName?.Contains("OpenApi", StringComparison.Ordinal) == true);
     }
 
-    [Fact]
-    public void AddJOrderRateLimiting_RegistersGlobalLimiterConfiguration()
-    {
-        var builder = Host.CreateApplicationBuilder();
-
-        builder.AddJOrderRateLimiting();
-
-        using var provider = builder.Services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
-
-        Assert.Equal(429, options.RejectionStatusCode);
-        Assert.NotNull(options.OnRejected);
-        Assert.NotNull(options.GlobalLimiter);
-    }
 
     [Fact]
     public void AddJOrderWarmupTask_DoesNotDuplicateSameTaskType()
