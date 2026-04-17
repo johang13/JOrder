@@ -22,7 +22,11 @@ internal static class ControllerLoggingHelper
     /// </param>
     internal static void LogMappedControllers(WebApplication webApplication)
     {
-        var entryAssembly = Assembly.GetEntryAssembly();
+        LogMappedControllers(webApplication, Assembly.GetEntryAssembly());
+    }
+
+    internal static void LogMappedControllers(WebApplication webApplication, Assembly? entryAssembly)
+    {
         if (entryAssembly is null)
         {
             webApplication.Logger.LogWarning("Could not determine entry assembly.");
@@ -49,9 +53,9 @@ internal static class ControllerLoggingHelper
 
             var controllerRoute = controller.GetCustomAttribute<RouteAttribute>();
             var controllerRoutePath = controllerRoute?.Template ?? "";
-            
+
             // Replace [controller] token with actual controller name (without "Controller" suffix)
-            var controllerName = controller.Name.EndsWith("Controller") 
+            var controllerName = controller.Name.EndsWith("Controller")
                 ? controller.Name.Substring(0, controller.Name.Length - "Controller".Length)
                 : controller.Name;
             controllerRoutePath = controllerRoutePath.Replace("[controller]", controllerName);
@@ -77,7 +81,7 @@ internal static class ControllerLoggingHelper
                 var fullPath = string.IsNullOrEmpty(routeTemplate)
                     ? controllerRoutePath.TrimEnd('/')
                     : $"{controllerRoutePath.TrimEnd('/')}/{routeTemplate.TrimStart('/')}";
-                
+
                 fullPath = fullPath.TrimStart('/').TrimEnd('/');
                 if (string.IsNullOrEmpty(fullPath))
                     fullPath = "/";

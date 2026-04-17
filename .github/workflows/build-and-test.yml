@@ -125,8 +125,7 @@ jobs:
               for ns in sorted(projects[project]):
                   lc, lv, bc, bv = projects[project][ns]
                   p_lc += lc; p_lv += lv; p_bc += bc; p_bv += bv
-                  short_ns = ns.replace(f'{project}.', '') if ns.startswith(f'{project}.') else ns
-                  lines.append(f'| {short_ns} | {pct(lc, lv)} | {pct(bc, bv)} |\n')
+                  lines.append(f'| {ns} | {pct(lc, lv)} | {pct(bc, bv)} |\n')
               lines.append(f'| **Subtotal** | **{pct(p_lc, p_lv)}** | **{pct(p_bc, p_bv)}** |\n\n')
               total_lc += p_lc; total_lv += p_lv; total_bc += p_bc; total_bv += p_bv
 

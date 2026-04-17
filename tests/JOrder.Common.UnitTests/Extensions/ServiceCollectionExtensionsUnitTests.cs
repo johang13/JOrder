@@ -53,6 +53,31 @@ public class ServiceCollectionExtensionsUnitTests
     }
 
     [Fact]
+    public void AddJwtValidation_WithNullConfigureDelegate_BindsConfiguredOptions()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{JwtValidationOptions.SectionName}:Authority"] = "https://identity.jorder.local",
+            [$"{JwtValidationOptions.SectionName}:Audience"] = "jorder-api",
+            [$"{JwtValidationOptions.SectionName}:RequireHttpsMetadata"] = "true"
+        });
+
+        var services = builder.Services;
+        var returned = services.AddJwtValidation();
+
+        Assert.Same(services, returned);
+
+        using var provider = services.BuildServiceProvider();
+        var jwtOptions = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        Assert.Equal("https://identity.jorder.local", jwtOptions.Authority);
+        Assert.Equal("jorder-api", jwtOptions.Audience);
+        Assert.True(jwtOptions.RequireHttpsMetadata);
+    }
+
+    [Fact]
     public void AddJOrderOptions_RegistersTypedOptionsBinding()
     {
         var builder = Host.CreateApplicationBuilder();

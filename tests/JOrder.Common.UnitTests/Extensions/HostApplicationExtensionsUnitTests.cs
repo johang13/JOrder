@@ -5,6 +5,7 @@ using JOrder.Common.Extensions;
 using JOrder.Common.Options;
 using JOrder.Common.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,39 @@ public class HostApplicationExtensionsUnitTests
         Assert.NotNull(provider.GetService<TimeProvider>());
         Assert.NotNull(provider.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>());
         Assert.NotNull(provider.GetService<ICurrentUser>());
+    }
+
+    [Fact]
+    public void AddJOrderCommon_WhenWebApplicationBuilder_RegistersControllersAndOpenApi()
+    {
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{ServiceOptions.SectionName}:Name"] = "svc",
+            [$"{ServiceOptions.SectionName}:Version"] = "1.0.0"
+        });
+
+        builder.AddJOrderCommon();
+
+        using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.Contains(builder.Services, d => d.ServiceType.FullName == "Microsoft.AspNetCore.Mvc.Infrastructure.IActionDescriptorCollectionProvider");
+        Assert.Contains(builder.Services, d => d.ServiceType.FullName?.Contains("OpenApi", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void AddJOrderRateLimiting_RegistersGlobalLimiterConfiguration()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        Assert.Equal(429, options.RejectionStatusCode);
+        Assert.NotNull(options.OnRejected);
+        Assert.NotNull(options.GlobalLimiter);
     }
 
     [Fact]
@@ -73,6 +107,58 @@ public class HostApplicationExtensionsUnitTests
 
         Assert.NotSame(transient1, transient2);
         Assert.Same(singleton1, singleton2);
+    }
+
+    [Fact]
+    public void AddJOrderServicesFromAssembly_IgnoresUnattributedTypes_AndFrameworkInterfaces()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        builder.AddJOrderServicesFromAssembly(Assembly.GetExecutingAssembly());
+
+        Assert.DoesNotContain(builder.Services,
+            d => d.ServiceType == typeof(IUnattributedService) && d.ImplementationType == typeof(UnattributedService));
+        Assert.DoesNotContain(builder.Services,
+            d => d.ServiceType == typeof(IDisposable) && d.ImplementationType == typeof(MixedInterfaceService));
+        Assert.Contains(builder.Services,
+            d => d.ServiceType == typeof(IMixedInterfaceService) && d.ImplementationType == typeof(MixedInterfaceService));
+    }
+
+    [Fact]
+    public void AddJOrderJwtValidation_ConfiguresJwtBearerOptionsFromConfiguration()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{JwtValidationOptions.SectionName}:Authority"] = "https://identity.example.local",
+            [$"{JwtValidationOptions.SectionName}:Audience"] = "jorder-api",
+            [$"{JwtValidationOptions.SectionName}:RequireHttpsMetadata"] = "false"
+        });
+
+        builder.AddJOrderJwtValidation(options => options.SaveToken = true);
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        Assert.Equal("https://identity.example.local", options.Authority);
+        Assert.Equal("jorder-api", options.Audience);
+        Assert.False(options.RequireHttpsMetadata);
+        Assert.True(options.SaveToken);
+    }
+
+    [Fact]
+    public void AddJOrderJwtAuthentication_AppliesCustomConfiguration()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        builder.AddJOrderJwtAuthentication(options => options.SaveToken = true);
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        Assert.True(options.SaveToken);
     }
 
     [Fact]
@@ -129,6 +215,8 @@ public class HostApplicationExtensionsUnitTests
     public interface ITestScopedService;
     public interface ITestTransientService;
     public interface ITestSingletonService;
+    public interface IMixedInterfaceService;
+    public interface IUnattributedService;
 
     [ScopedService]
     public sealed class TestScopedService : ITestScopedService;
@@ -142,6 +230,16 @@ public class HostApplicationExtensionsUnitTests
     [ScopedService]
     public sealed class SelfRegisteredService;
 
+    [TransientService]
+    public sealed class MixedInterfaceService : IMixedInterfaceService, IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
+
+    public sealed class UnattributedService : IUnattributedService;
+
     private sealed class StubCurrentUser : ICurrentUser
     {
         public Guid? Id => null;
@@ -151,5 +249,3 @@ public class HostApplicationExtensionsUnitTests
 
     private sealed class TestDbContext(DbContextOptions<TestDbContext> options) : DbContext(options);
 }
-
-
