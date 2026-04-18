@@ -1,0 +1,203 @@
+# JOrder
+
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-containers-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-local-326CE5?logo=kubernetes&logoColor=white)
+![xUnit](https://img.shields.io/badge/Tests-xUnit-5D2D8E)
+[![Build and Test](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml)
+
+## Overview
+
+JOrder is a sample microservices application built with .NET 10, designed as a stock management and order processing platform. It serves as a reference implementation for building scalable, maintainable, and secure microservices — demonstrating patterns and practices production .NET systems are built on.
+
+## Patterns & Practices
+
+- **Result pattern** — typed `Result<T>` / `Error` abstractions replacing exception-driven control flow
+- **Attribute-driven DI** — `[ScopedService]`, `[SingletonService]`, `[TransientService]` for zero-boilerplate registration
+- **EF Core interceptors** — `AuditableInterceptor` automatically stamps `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`
+- **Rate limiting** — attribute-driven per-endpoint fixed-window and sliding-window limits via `[RateLimit]`
+- **JWT / OIDC** — Identity service mints JWTs and exposes a JWKS endpoint; downstream services validate via standard OIDC discovery
+- **Request logging middleware** — structured timing and origin logging, skipping health probe paths
+- **Clean shared library** — `JOrder.Common` houses cross-cutting concerns reused across all services
+- **Unit tested** — xUnit + NSubstitute, with a shared `JOrder.Testing` base for controller test infrastructure
+
+## Current State
+
+```mermaid
+flowchart LR
+    C([Client]) --> ID[Identity]
+    ID --> IDDB[(Identity DB)]
+    ID -. JWKS/OIDC .-> C
+```
+
+## Target State - High Level Solution Design
+
+```mermaid
+flowchart LR
+    C([Client]) --> G[API Gateway]
+
+    G --> ID[Identity]
+    G --> AC[Account]
+    G --> CAT[Catalogue]
+    G --> INV[Inventory]
+    G --> ORD[Order]
+    G --> BILL[Invoice]
+
+    ID --> IDDB[(Identity DB)]
+    AC --> ACDB[(Account DB)]
+    CAT --> CATDB[(Catalogue DB)]
+    INV --> INVDB[(Inventory DB)]
+    ORD --> ORDDB[(Order DB)]
+    BILL --> BILLDB[(Invoice DB)]
+
+    ORD -->|validate products| CAT
+    ORD -->|reserve stock| INV
+    BILL -->|account terms| AC
+
+    ORD -. OrderPlaced .-> BUS[[Service Bus]]
+    BUS -. OrderPlaced .-> BILL
+    BUS -. OrderPlaced .-> INV
+
+    ID -. JWKS/OIDC .-> G
+```
+
+## Solution Structure
+
+```
+JOrder/
+├── src/
+│   ├── JOrder.Common/          # Shared library — cross-cutting concerns for all services
+│   │   ├── Abstractions/       # Result<T> / Error pattern
+│   │   ├── Attributes/         # DI registration & rate limit attributes
+│   │   ├── Extensions/         # IHostApplicationBuilder, ControllerBase extensions
+│   │   ├── Middleware/         # Request origin logging
+│   │   ├── Models/             # AuditableEntity base
+│   │   ├── Options/            # Strongly-typed config (JWT, DB, Service)
+│   │   ├── Persistence/        # AuditableInterceptor
+│   │   └── Services/           # CurrentUser
+│   └── JOrder.Identity/        # Identity service (auth, JWT minting, user management)
+│       ├── Application/        # Application layer (commands, handlers)
+│       ├── Controllers/        # Auth & Users API controllers
+│       ├── Persistence/        # EF Core DbContext & migrations
+│       └── Services/           # Auth, token, and user services
+└── tests/
+    ├── JOrder.Testing/         # Shared test infrastructure (ApiControllerUnitTestBase etc.)
+    ├── JOrder.Common.UnitTests/
+    └── JOrder.Identity.UnitTests/
+```
+
+## Getting Started
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (with Docker daemon running)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) connected to a local cluster (e.g. [Docker Desktop](https://docs.docker.com/desktop/kubernetes/) or [kind](https://kind.sigs.k8s.io/))
+- A default ingress controller installed in the cluster
+
+Verify your environment is ready:
+
+```sh
+make preflight
+```
+
+### Running a Service Locally
+
+No Kubernetes required — you can run any service directly with the .NET CLI. You'll need a reachable PostgreSQL instance (connection string in `appsettings.json`):
+
+```sh
+cd src/JOrder.Identity
+dotnet run
+```
+
+To run the tests:
+
+```sh
+dotnet test
+```
+
+### Deploying to Kubernetes
+
+Build a service image and roll it out:
+
+```sh
+make build identity
+# or build all services
+make build all
+```
+
+Deploy to the local Kubernetes overlay:
+
+```sh
+make deploy identity
+# or deploy all services
+make deploy all
+```
+
+Services are exposed at `<service>.jorder.localhost` — `*.localhost` resolves to `127.0.0.1` per RFC 6761, so no `/etc/hosts` edits are needed.
+
+### Useful Commands
+
+| Command | Description |
+|---|---|
+| `make preflight` | Verify Docker, kubectl, and ingress are ready |
+| `make list-services` | List all discovered services and their ingress URLs |
+| `make build <service\|all>` | Build Docker image(s) |
+| `make deploy <service\|all>` | Build, push, and roll out to the local cluster |
+| `make restart <service\|all>` | Restart running deployment(s) without rebuilding |
+
+## Design Decisions
+
+### Inter-service Communication
+
+Not all service-to-service calls are equal. JOrder distinguishes between calls that need an immediate response and those that are better handled asynchronously.
+
+| Interaction | Style | Rationale |
+|---|---|---|
+| `Order → Catalogue` | Sync (HTTP) | Product prices and availability must be validated before an order is accepted |
+| `Order → Inventory` | Sync (HTTP) | Stock reservation needs immediate confirmation to accept or reject the order |
+| `Order → Invoice` | Async (event) | Invoice generation does not need to block the order response — triggered by `OrderPlaced` event |
+| `Invoice → Account` | Sync (HTTP) | Invoice requires account terms (credit limits, payment terms) to generate correctly |
+| `Inventory` (restock) | Async (event) | Low-stock and reorder threshold alerts are fire-and-forget notifications |
+
+### Service Bus
+
+A message broker (e.g. RabbitMQ or Azure Service Bus) acts as the async backbone. Services publish domain events and subscribe to the events they care about — no direct coupling between publisher and consumer. This means:
+
+- **Order Service** publishes `OrderPlaced` and moves on
+- **Invoice Service** and **Inventory Service** react independently at their own pace
+- If a consumer is temporarily down, the broker holds messages until it recovers
+
+## Roadmap
+
+- [x] Initial project setup and architecture design
+- [ ] Implement core microservices
+  - [ ] Identity Service
+    - JWT minting and auth
+    - User management (registration, login)
+    - Role assignment and permissions
+  - [ ] Catalogue Service
+    - Product management
+    - Category management
+    - Pricing metadata
+    - Product lifecycle
+  - [ ] Inventory Service
+    - Stock availability
+    - Stock movement
+    - Reorder thresholds
+  - [ ] Order Service
+    - Order creation and management
+    - Order status tracking
+    - Order validation and processing
+  - [ ] Invoice Service
+    - Invoice generation
+    - Invoice management
+  - [ ] Account Service
+    - Customer account management
+    - Billing and shipping information
+    - Account terms and conditions
+    - Credit limits and payment terms
+- [ ] Implement API Gateway
+- [ ] Telemetry and monitoring
+- [ ] Security hardening
+- [ ] Documentation and sample client applications

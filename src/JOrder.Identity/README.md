@@ -16,7 +16,7 @@ Other services validate tokens through OIDC discovery/JWKS, you do not need to m
 Optional: verify the private key format.
 
 ```bash
-openssl pkey -in keys/signing-key.pem -check -noout
+openssl rsa -in keys/signing-key.pem -check -noout
 ```
 
 Finally, create a Kubernetes secret for the private key, so it can be mounted in the container.
