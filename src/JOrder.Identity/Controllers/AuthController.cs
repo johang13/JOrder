@@ -43,13 +43,17 @@ public class AuthController(IAuthService authService) : ControllerBase
         if (result.IsFailure)
             return this.ToActionResult(result.Error);
 
-        return StatusCode(StatusCodes.Status201Created, new RegisterResponseDto
-        {
-            AccessToken = result.Value.AccessToken,
-            AccessTokenExpiresAt = result.Value.AccessTokenExpiresAt,
-            RefreshToken = result.Value.RefreshToken,
-            RefreshTokenExpiresAt = result.Value.RefreshTokenExpiresAt,
-        });
+        return CreatedAtAction(
+            nameof(UsersController.GetUserProfile),
+            "Users",
+            routeValues: null,
+            value: new RegisterResponseDto
+            {
+                AccessToken = result.Value.AccessToken,
+                AccessTokenExpiresAt = result.Value.AccessTokenExpiresAt,
+                RefreshToken = result.Value.RefreshToken,
+                RefreshTokenExpiresAt = result.Value.RefreshTokenExpiresAt,
+            });
     }
 
     /// <summary>

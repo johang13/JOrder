@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\JOrder.Common\JOrder.Common.csproj" />
+    <ProjectReference Include="..\JOrder.Testing\JOrder.Testing.csproj" />
   </ItemGroup>
 
 </Project>

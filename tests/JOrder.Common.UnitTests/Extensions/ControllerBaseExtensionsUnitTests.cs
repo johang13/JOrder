@@ -2,6 +2,7 @@ using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace JOrder.Common.UnitTests.Extensions;
 
@@ -77,6 +78,44 @@ public class ControllerBaseExtensionsUnitTests
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public void GetUserIdClaim_WithSubAndNameIdentifier_ReturnsSub()
+    {
+        SetUserClaims(
+            new Claim("sub", "user-from-sub"),
+            new Claim(ClaimTypes.NameIdentifier, "user-from-nameid"));
+
+        var userId = _controller.GetUserIdClaim();
+
+        Assert.Equal("user-from-sub", userId);
+    }
+
+    [Fact]
+    public void GetUserIdClaim_WithoutSub_ReturnsNameIdentifier()
+    {
+        SetUserClaims(new Claim(ClaimTypes.NameIdentifier, "user-from-nameid"));
+
+        var userId = _controller.GetUserIdClaim();
+
+        Assert.Equal("user-from-nameid", userId);
+    }
+
+    [Fact]
+    public void GetUserIdClaim_WithoutSubOrNameIdentifier_ReturnsNull()
+    {
+        SetUserClaims(new Claim(ClaimTypes.Email, "john@example.com"));
+
+        var userId = _controller.GetUserIdClaim();
+
+        Assert.Null(userId);
+    }
+
+    private void SetUserClaims(params Claim[] claims)
+    {
+        _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(
+            new ClaimsIdentity(claims, authenticationType: "UnitTest"));
     }
 
     private sealed class TestController : ControllerBase;
