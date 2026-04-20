@@ -1,10 +1,10 @@
 # JOrder
 
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-containers-2496ED?logo=docker&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-local-326CE5?logo=kubernetes&logoColor=white)
-![xUnit](https://img.shields.io/badge/Tests-xUnit-5D2D8E)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-containers-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-local-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![xUnit](https://img.shields.io/badge/Tests-xUnit-5D2D8E)](https://xunit.net/)
 [![Build and Test (main)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml?query=branch%3Amain)
 
 ## Overview

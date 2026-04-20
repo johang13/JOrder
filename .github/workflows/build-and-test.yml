@@ -3,9 +3,16 @@ run-name: Build and Test for ${{ github.event_name }} on ${{ github.ref_name }}
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'JOrder.slnx'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'JOrder.slnx'
   workflow_dispatch:
 
 jobs:
