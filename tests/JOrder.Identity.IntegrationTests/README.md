@@ -20,7 +20,7 @@ This project runs database-backed integration tests for `JOrder.Identity` agains
 From repository root:
 
 ```zsh
-dotnet test "/Users/chris/repos/JOrder/tests/JOrder.Identity.IntegrationTests/JOrder.Identity.IntegrationTests.csproj"
+dotnet test tests/JOrder.Identity.IntegrationTests/JOrder.Identity.IntegrationTests.csproj
 ```
 
 Run all tests:
