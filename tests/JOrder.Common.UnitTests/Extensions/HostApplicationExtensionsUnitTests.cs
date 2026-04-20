@@ -1,10 +1,15 @@
+using System.Net;
 using System.Reflection;
+using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Threading.RateLimiting;
 using JOrder.Common.Attributes;
 using JOrder.Common.Extensions;
 using JOrder.Common.Options;
 using JOrder.Common.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +58,137 @@ public class HostApplicationExtensionsUnitTests
         Assert.Contains(builder.Services, d => d.ServiceType.FullName?.Contains("OpenApi", StringComparison.Ordinal) == true);
     }
 
+
+    [Fact]
+    public void AddJOrderCommon_WhenWebApplicationBuilder_UsesApplicationName_WhenServiceOptionsNameIsNull()
+    {
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder();
+        // No ServiceOptions configured — serviceOptions will be null, falling back to ApplicationName
+
+        builder.AddJOrderCommon();
+
+        Assert.Contains(builder.Services,
+            d => d.ServiceType.FullName?.Contains("OpenApi", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void AddJOrderRateLimiting_SetsRejectionStatusCodeTo429()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        Assert.Equal(StatusCodes.Status429TooManyRequests, options.RejectionStatusCode);
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_OnRejected_SetsRetryAfterHeader_WhenRetryAfterMetadataPresent()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext();
+        var lease = new StubRateLimitLease(hasRetryAfter: true, retryAfter: TimeSpan.FromSeconds(42));
+
+        await options.OnRejected!(new OnRejectedContext { HttpContext = httpContext, Lease = lease }, CancellationToken.None);
+
+        Assert.Equal("42", httpContext.Response.Headers.RetryAfter.ToString());
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_OnRejected_DoesNotSetRetryAfterHeader_WhenNoRetryAfterMetadata()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext();
+        var lease = new StubRateLimitLease(hasRetryAfter: false, retryAfter: default);
+
+        await options.OnRejected!(new OnRejectedContext { HttpContext = httpContext, Lease = lease }, CancellationToken.None);
+
+        Assert.False(httpContext.Response.Headers.ContainsKey("Retry-After"));
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_GlobalLimiter_ReturnsSuccessfulLease_WhenNoEndpointSet()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext(); // no endpoint → attr is null
+
+        using var lease = await options.GlobalLimiter!.AcquireAsync(httpContext);
+
+        Assert.True(lease.IsAcquired);
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_GlobalLimiter_ReturnsSuccessfulLease_WhenRateLimitAttributePresentAndNoConcurrencyLimit()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext();
+        var attr = new RateLimitAttribute(10, 60, maxConcurrentRequests: 0);
+        httpContext.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(attr), "route-a"));
+        httpContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+
+        using var lease = await options.GlobalLimiter!.AcquireAsync(httpContext);
+
+        Assert.True(lease.IsAcquired);
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_GlobalLimiter_ReturnsSuccessfulLease_WhenRateLimitAttributePresentWithConcurrencyLimit()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext();
+        var attr = new RateLimitAttribute(10, 60, maxConcurrentRequests: 5);
+        httpContext.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(attr), "route-b"));
+        httpContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+
+        using var lease = await options.GlobalLimiter!.AcquireAsync(httpContext);
+
+        Assert.True(lease.IsAcquired);
+    }
+
+    [Fact]
+    public async Task AddJOrderRateLimiting_GlobalLimiter_UsesUnknownIpFallback_WhenRemoteIpAddressIsNull()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.AddJOrderRateLimiting();
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
+
+        var httpContext = new DefaultHttpContext();
+        var attr = new RateLimitAttribute(10, 60, maxConcurrentRequests: 2);
+        httpContext.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(attr), "route-c"));
+        // RemoteIpAddress is null by default → partition key falls back to "unknown"
+
+        using var lease = await options.GlobalLimiter!.AcquireAsync(httpContext);
+
+        Assert.True(lease.IsAcquired);
+    }
 
     [Fact]
     public void AddJOrderWarmupTask_DoesNotDuplicateSameTaskType()
@@ -165,6 +301,11 @@ public class HostApplicationExtensionsUnitTests
         Assert.Equal(key, options.TokenValidationParameters.IssuerSigningKey);
         Assert.True(options.TokenValidationParameters.ValidateIssuer);
         Assert.True(options.TokenValidationParameters.ValidateAudience);
+        Assert.True(options.TokenValidationParameters.ValidateIssuerSigningKey);
+        Assert.True(options.TokenValidationParameters.ValidateLifetime);
+        Assert.Equal(TimeSpan.FromMinutes(1), options.TokenValidationParameters.ClockSkew);
+        Assert.Equal(ClaimTypes.Name, options.TokenValidationParameters.NameClaimType);
+        Assert.Equal(ClaimTypes.Role, options.TokenValidationParameters.RoleClaimType);
     }
 
     [Fact]
@@ -224,6 +365,25 @@ public class HostApplicationExtensionsUnitTests
     }
 
     public sealed class UnattributedService : IUnattributedService;
+
+    private sealed class StubRateLimitLease(bool hasRetryAfter, TimeSpan retryAfter) : RateLimitLease
+    {
+        public override bool IsAcquired => false;
+
+        public override IEnumerable<string> MetadataNames =>
+            hasRetryAfter ? [MetadataName.RetryAfter.Name] : [];
+
+        public override bool TryGetMetadata(string metadataName, out object? metadata)
+        {
+            if (hasRetryAfter && metadataName == MetadataName.RetryAfter.Name)
+            {
+                metadata = retryAfter;
+                return true;
+            }
+            metadata = null;
+            return false;
+        }
+    }
 
     private sealed class StubCurrentUser : ICurrentUser
     {
