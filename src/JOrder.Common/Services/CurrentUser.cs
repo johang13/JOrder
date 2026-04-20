@@ -1,7 +1,7 @@
-using Microsoft.IdentityModel.JsonWebTokens;
 using System.Security.Claims;
 using JOrder.Common.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace JOrder.Common.Services;
 

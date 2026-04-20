@@ -1,8 +1,8 @@
+using System.Security.Cryptography;
 using JOrder.Identity.Options;
 using JOrder.Identity.Services;
 using Microsoft.AspNetCore.Hosting;
 using NSubstitute;
-using System.Security.Cryptography;
 
 namespace JOrder.Identity.UnitTests.Services;
 

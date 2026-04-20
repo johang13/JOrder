@@ -1,10 +1,10 @@
 using JOrder.Identity.Contracts.Responses;
-using Microsoft.IdentityModel.JsonWebTokens;
 using JOrder.Identity.Options;
 using JOrder.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace JOrder.Identity.Controllers;
 

@@ -1,5 +1,4 @@
 using JOrder.Common.Abstractions.Results;
-using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Models;
 using JOrder.Identity.Services;

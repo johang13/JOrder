@@ -5,7 +5,6 @@ using JOrder.Common.Services.Interfaces;
 using JOrder.Testing.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace JOrder.Common.UnitTests.Persistence;

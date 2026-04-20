@@ -1,9 +1,9 @@
 using JOrder.Identity.Application.Auth.Commands;
+using JOrder.Identity.IntegrationTests.TestInfrastructure;
 using JOrder.Identity.Models;
 using JOrder.Identity.Persistence;
 using JOrder.Identity.Services;
 using JOrder.Identity.Services.Interfaces;
-using JOrder.Identity.IntegrationTests.TestInfrastructure;
 using JOrder.Testing.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;

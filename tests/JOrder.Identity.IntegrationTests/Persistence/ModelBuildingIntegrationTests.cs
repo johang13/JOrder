@@ -1,5 +1,5 @@
-using JOrder.Identity.Models;
 using JOrder.Identity.IntegrationTests.TestInfrastructure;
+using JOrder.Identity.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace JOrder.Identity.IntegrationTests.Persistence;

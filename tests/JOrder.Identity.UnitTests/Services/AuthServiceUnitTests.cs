@@ -5,8 +5,8 @@ using JOrder.Identity.Persistence;
 using JOrder.Identity.Services;
 using JOrder.Identity.Services.Interfaces;
 using JOrder.Identity.UnitTests.TestInfrastructure;
-using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 

@@ -1,8 +1,8 @@
+using System.Security.Claims;
 using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace JOrder.Common.UnitTests.Extensions;
 

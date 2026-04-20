@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
 using JOrder.Identity.Models;
 using JOrder.Identity.Options;
 using JOrder.Identity.Services;
@@ -6,8 +8,6 @@ using JOrder.Testing.Time;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
-using System.Security.Claims;
-using System.Security.Cryptography;
 
 namespace JOrder.Identity.UnitTests.Services;
 
