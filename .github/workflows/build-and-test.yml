@@ -15,6 +15,10 @@ on:
       - 'JOrder.slnx'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -77,44 +81,14 @@ jobs:
               --collect:"XPlat Code Coverage"
           done
 
-
-      - name: Generate test summary
+      - name: Publish test results
         if: always()
-        run: |
-          python3 << 'EOF'
-          import xml.etree.ElementTree as ET
-          import glob
-          import os
-
-          ns = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
-          lines = [
-              "## Test Results\n",
-              "\n",
-              "| Project | Tests | Passed |\n",
-              "| ------- | :---: | :----: |\n",
-          ]
-
-          for trx_file in sorted(glob.glob('./test-results/**/*.trx', recursive=True)):
-              tree = ET.parse(trx_file)
-              root = tree.getroot()
-              first_test = root.find('.//t:UnitTest', ns)
-              if first_test is not None:
-                  storage = first_test.get('storage', '')
-                  project = os.path.splitext(os.path.basename(storage))[0]
-              else:
-                  dir_name = os.path.basename(os.path.dirname(trx_file))
-                  project = dir_name.split('_')[0] if '_' in dir_name else dir_name
-              counters = root.find('.//t:Counters', ns)
-              if counters is not None:
-                  total  = int(counters.get('total',  0))
-                  failed = int(counters.get('failed', 0))
-                  badge  = '✅' if failed == 0 else '❌'
-                  lines.append(f'| {project} | {total} | {badge} |\n')
-
-          summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
-          with open(summary_path, 'a') as f:
-              f.writelines(lines)
-          EOF
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: ./test-results/**/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
 
       - name: Detect coverage files
         id: detect_coverage
