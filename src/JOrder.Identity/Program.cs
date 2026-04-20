@@ -47,8 +47,19 @@ var signingConfig = builder.Configuration
 if (signingConfig is null)
     throw new InvalidOperationException("JWT signing configuration is missing");
 
+var privateKeyPath = System.IO.Path.IsPathRooted(signingConfig.PrivateKeyPath)
+    ? signingConfig.PrivateKeyPath
+    : System.IO.Path.Combine(builder.Environment.ContentRootPath, signingConfig.PrivateKeyPath);
+
+if (!System.IO.File.Exists(privateKeyPath))
+{
+    throw new InvalidOperationException(
+        $"JWT signing private key file was not found at '{privateKeyPath}'. " +
+        $"Configure '{JwtSigningOptions.SectionName}:{nameof(JwtSigningOptions.PrivateKeyPath)}' with an absolute path or a path relative to the application content root '{builder.Environment.ContentRootPath}'.");
+}
+
 using var rsa = RSA.Create();
-rsa.ImportFromPem(File.ReadAllText(signingConfig.PrivateKeyPath));
+rsa.ImportFromPem(System.IO.File.ReadAllText(privateKeyPath));
 var publicKey = new RsaSecurityKey(rsa.ExportParameters(false));
 builder.AddJOrderJwtIssuerAuthentication(signingConfig.Issuer, signingConfig.Audience, publicKey);
 

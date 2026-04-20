@@ -207,7 +207,7 @@ public async Task<IActionResult> Login(LoginRequestDto request)
 From repository root:
 
 ```zsh
-dotnet test "/Users/chris/repos/JOrder/tests/JOrder.Common.UnitTests/JOrder.Common.UnitTests.csproj"
+dotnet test tests/JOrder.Common.UnitTests/JOrder.Common.UnitTests.csproj
 ```
 
 Or run all tests in the solution:

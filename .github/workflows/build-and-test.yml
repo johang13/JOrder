@@ -6,12 +6,14 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - '.github/workflows/**'
       - 'JOrder.slnx'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
       - 'tests/**'
+      - '.github/workflows/**'
       - 'JOrder.slnx'
   workflow_dispatch:
 
