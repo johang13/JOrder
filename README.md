@@ -171,11 +171,13 @@ builder.AddJOrderJwtValidation();
 For synchronous service-to-service calls that originate from a user request (for example, Order -> Catalogue), the **same JWT the user presented** is forwarded outbound. `BearerTokenForwardingHandler` in `JOrder.Common` does this automatically; attach it to any typed `HttpClient` registration:
 
 ```csharp
+builder.AddJOrderBearerForwarding();
+
 builder.Services.AddHttpClient<ICatalogueClient, CatalogueClient>()
     .WithBearerForwarding();
 ```
 
-`BearerTokenForwardingHandler` is registered by `AddJOrderCommon`, so no extra registration is needed. The downstream service validates that same token with its own JWT bearer middleware, without a second auth round-trip.
+`BearerTokenForwardingHandler` is registered by `AddJOrderBearerForwarding()`. The downstream service validates that same token with its own JWT bearer middleware, without a second auth round-trip.
 
 ### Inter-service Communication
 

@@ -52,12 +52,10 @@ public static class HostApplicationExtensions
         services.AddSingleton(TimeProvider.System);
 
         services.AddScoped<ICurrentUser, CurrentUser>();
-
-        services.AddHttpContextAccessor();
-        builder.AddJOrderBearerForwarding();
         
-        if (builder is Microsoft.AspNetCore.Builder.WebApplicationBuilder)
+        if (builder is WebApplicationBuilder)
         {
+            services.AddHttpContextAccessor();
             services.AddControllers();
             services.AddJOrderOpenApi(serviceOptions?.Name ?? builder.Environment.ApplicationName);
         }

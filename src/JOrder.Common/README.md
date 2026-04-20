@@ -34,6 +34,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddJOrderCommon();
+builder.AddJOrderBearerForwarding();
 builder.AddJOrderRateLimiting();
 
 builder.AddJOrderDatabase<MyDbContext>((_, options, dbOptions) =>
@@ -136,7 +137,8 @@ Behavior:
 
 From `HostApplicationExtensions`:
 
-- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, `HttpContextAccessor`, controllers, and OpenAPI
+- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, and web-only services (`HttpContextAccessor`, controllers, OpenAPI)
+- `AddJOrderBearerForwarding()` - registers `BearerTokenForwardingHandler` for outbound token propagation
 - `AddJOrderRateLimiting()` - enables global per-IP rate limiting driven by `[RateLimit]`
 - `AddJOrderOptions<TOptions>()` - binds and validates options on startup
 - `AddJOrderDatabase<TDbContext>(...)` - registers DbContext and auditing interceptor

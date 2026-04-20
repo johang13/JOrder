@@ -90,7 +90,7 @@ sequenceDiagram
 
 At startup, the service:
 
-1. Registers common middleware, OpenAPI, rate limiting, and DI-scanned services
+1. Registers common middleware/OpenAPI, explicit bearer-forwarding support, rate limiting, and DI-scanned services
 2. Configures EF Core + ASP.NET Identity using `JOrderIdentityDbContext`
 3. Loads JWT signing options and configures bearer validation for self-issued tokens
 4. Runs warmup tasks (including signing key material warmup)
