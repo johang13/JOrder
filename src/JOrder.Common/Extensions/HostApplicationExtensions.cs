@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using JOrder.Common.Attributes;
+using JOrder.Common.Helpers;
 using JOrder.Common.Options;
 using JOrder.Common.Options.Interfaces;
 using JOrder.Common.Persistence;
@@ -53,6 +54,7 @@ public static class HostApplicationExtensions
         services.AddScoped<ICurrentUser, CurrentUser>();
 
         services.AddHttpContextAccessor();
+        builder.AddJOrderBearerForwarding();
         
         if (builder is Microsoft.AspNetCore.Builder.WebApplicationBuilder)
         {
@@ -315,6 +317,22 @@ public static class HostApplicationExtensions
         if (type.GetCustomAttribute<TransientServiceAttribute>() is not null)  return ServiceLifetime.Transient;
         if (type.GetCustomAttribute<SingletonServiceAttribute>() is not null)  return ServiceLifetime.Singleton;
         return null;
+    }
+
+    /// <summary>
+    /// Registers <see cref="BearerTokenForwardingHandler"/> as a transient service.
+    /// After calling this, attach the handler to any typed <c>HttpClient</c> registration:
+    /// <code>
+    /// builder.Services.AddHttpClient&lt;IOrderClient, OrderClient&gt;()
+    ///     .AddHttpMessageHandler&lt;BearerTokenForwardingHandler&gt;();
+    /// </code>
+    /// <c>IHttpContextAccessor</c> is registered automatically by <see cref="AddJOrderCommon"/>;
+    /// this method does not need to be called separately when that method is used.
+    /// </summary>
+    public static IHostApplicationBuilder AddJOrderBearerForwarding(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddTransient<BearerTokenForwardingHandler>();
+        return builder;
     }
 }
 

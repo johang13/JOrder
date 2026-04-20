@@ -1,6 +1,5 @@
 using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Attributes;
-using JOrder.Common.Extensions;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Auth.Results;
 using JOrder.Identity.Contracts.Requests;
@@ -73,110 +72,6 @@ public class OAuthController(IOAuth2Service oauth2Service) : ControllerBase
         }
     }
 
-    /// <summary>
-    /// OAuth 2.0 authorization endpoint. Initiates the Authorization Code flow.
-    /// </summary>
-    /// <remarks>
-    /// This endpoint supports the OAuth2 Authorization Code flow for interactive login.
-    /// If the user is not authenticated, they will be redirected to a login page.
-    /// Upon successful authentication and consent, an authorization code is issued.
-    /// </remarks>
-    /// <response code="302">Redirect to login or back to redirect_uri with authorization code.</response>
-    /// <response code="400">Invalid request parameters.</response>
-    /// <response code="500">Unexpected server error.</response>
-    [HttpGet("authorize")]
-    [Produces("application/json")]
-    [ProducesResponseType(StatusCodes.Status302Found)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status500InternalServerError)]
-    public IActionResult Authorize(
-        [FromQuery] string? client_id,
-        [FromQuery] string? redirect_uri,
-        [FromQuery] string? response_type,
-        [FromQuery] string? scope,
-        [FromQuery] string? state)
-    {
-        // Validate required parameters
-        if (string.IsNullOrWhiteSpace(response_type) || response_type != "code")
-            return OAuthError("invalid_request", "response_type must be 'code'.", StatusCodes.Status400BadRequest);
-
-        if (string.IsNullOrWhiteSpace(redirect_uri))
-            return OAuthError("invalid_request", "redirect_uri is required.", StatusCodes.Status400BadRequest);
-
-        // For documentation tools (Scalar, Swagger UI), we can allow implicit authorization
-        // In production, you'd validate client_id against registered applications
-        if (string.IsNullOrWhiteSpace(client_id))
-            client_id = "swagger";
-
-        // If user is authenticated, immediately issue authorization code and redirect
-        var userIdClaim = this.GetUserIdClaim();
-        if (Guid.TryParse(userIdClaim, out _))
-        {
-            var authorizationCode = GenerateAuthorizationCode();
-            var redirectUrl = BuildRedirectUrl(redirect_uri, authorizationCode, state);
-            return Redirect(redirectUrl);
-        }
-
-        // User not authenticated - for API docs, redirect to a simple login endpoint
-        var loginRedirect = $"/oauth2/login?redirect_uri={Uri.EscapeDataString(redirect_uri)}&client_id={Uri.EscapeDataString(client_id)}&scope={Uri.EscapeDataString(scope ?? "")}&state={Uri.EscapeDataString(state ?? "")}";
-        return Redirect(loginRedirect);
-    }
-
-    /// <summary>
-    /// Simple login page for Authorization Code flow.
-    /// </summary>
-    /// <remarks>
-    /// Provides a basic login form for users to authenticate.
-    /// After successful login, redirects back to the authorization endpoint.
-    /// </remarks>
-    [HttpGet("login")]
-    [AllowAnonymous]
-    public IActionResult Login(
-        [FromQuery] string? redirect_uri,
-        [FromQuery] string? client_id,
-        [FromQuery] string? scope,
-        [FromQuery] string? state)
-    {
-        // In a real application, this would render a login form
-        // For now, return a simple message directing users to the token endpoint
-        var response = new
-        {
-            message = "For interactive login, please use the password grant at /oauth2/token",
-            instructions = new
-            {
-                method = "POST",
-                endpoint = "/oauth2/token",
-                contentType = "application/x-www-form-urlencoded",
-                parameters = new
-                {
-                    grant_type = "password",
-                    username = "your_email@example.com",
-                    password = "your_password"
-                }
-            },
-            redirect_uri,
-            scope
-        };
-
-        return Ok(response);
-    }
-
-    private static string GenerateAuthorizationCode()
-    {
-        // Generate a random authorization code (in production, store this with expiration)
-        return Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-    }
-
-    private static string BuildRedirectUrl(string redirectUri, string code, string? state)
-    {
-        var separator = redirectUri.Contains('?') ? '&' : '?';
-        var url = $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}";
-
-        if (!string.IsNullOrWhiteSpace(state))
-            url += $"&state={Uri.EscapeDataString(state)}";
-
-        return url;
-    }
 
     /// <summary>
     /// OAuth 2.0 revocation endpoint. Revokes the provided refresh token.

@@ -9,7 +9,7 @@
 
 ## Overview
 
-JOrder is a sample microservices application built with .NET 10, designed as a stock management and order processing platform. It serves as a reference implementation for building scalable, maintainable, and secure microservices — demonstrating patterns and practices production .NET systems are built on.
+JOrder is a sample .NET 10 microservices application for stock management and order processing. It acts as a practical reference for production-oriented patterns.
 
 ## Patterns & Practices
 
@@ -17,7 +17,7 @@ JOrder is a sample microservices application built with .NET 10, designed as a s
 - **Attribute-driven DI** — `[ScopedService]`, `[SingletonService]`, `[TransientService]` for zero-boilerplate registration
 - **EF Core interceptors** — `AuditableInterceptor` automatically stamps `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`
 - **Rate limiting** — attribute-driven per-endpoint fixed-window and sliding-window limits via `[RateLimit]`
-- **OAuth2 / OIDC** — Identity service implements OAuth2 resource owner password credentials and refresh token flows, mints JWTs (RSA RS256), exposes JWKS/discovery endpoints; downstream services validate tokens via standard OIDC discovery
+- **OAuth2 / token service** — Identity supports password and refresh-token grants, mints JWTs (RSA RS256), and exposes discovery + JWKS endpoints. Downstream services validate through `/.well-known/openid-configuration` + `/.well-known/jwks.json`, and can forward user Bearer tokens with `BearerTokenForwardingHandler`.
 - **Request logging middleware** — structured timing and origin logging, skipping health probe paths
 - **Clean shared library** — `JOrder.Common` houses cross-cutting concerns reused across all services
 - **Unit tested** — xUnit + NSubstitute, with a shared `JOrder.Testing` base for controller test infrastructure
@@ -28,18 +28,22 @@ JOrder is a sample microservices application built with .NET 10, designed as a s
 
 ```mermaid
 flowchart LR
-    C([Client]) --> ID[Identity]
+    C([Client]) -->|POST /oauth2/token<br/>password + refresh grants| ID[Identity]
+    C -->|Bearer API calls| ID
+    C -->|POST /oauth2/revoke| ID
     ID --> IDDB[(Identity DB)]
-    ID -. JWKS/OIDC .-> C
+    C -. discovery + JWKS .-> ID
 ```
 
 ### Target State
 
 ```mermaid
 flowchart LR
-    C([Client]) --> G[API Gateway]
+    C([Client]) -->|Bearer API calls| G[API Gateway]
+    C -->|POST /oauth2/token<br/>password + refresh grants| ID[Identity]
+    C -->|POST /oauth2/revoke| ID
 
-    G --> ID[Identity]
+    G -->|route auth endpoints| ID[Identity]
     G --> AC[Account]
     G --> CAT[Catalogue]
     G --> INV[Inventory]
@@ -61,8 +65,10 @@ flowchart LR
     BUS -. OrderPlaced .-> BILL
     BUS -. OrderPlaced .-> INV
 
-    ID -. JWKS/OIDC .-> G
+    G -. discovery + JWKS .-> ID
 ```
+
+These diagrams show the current OAuth2 contract: `POST /oauth2/token` supports `password` and `refresh_token`, and `POST /oauth2/revoke` revokes refresh tokens. Downstream services validate JWTs with discovery + JWKS. Authorization Code flow (for the web client) is tracked in the [Identity Service README](src/JOrder.Identity/README.md#web-client-roadmap).
 
 ## Solution Structure
 
@@ -153,6 +159,24 @@ Services are exposed at `<service>.jorder.localhost` — `*.localhost` resolves 
 
 ## Design Decisions
 
+### Authentication & Inter-service Token Propagation
+
+Every service validates incoming JWTs through discovery + JWKS, so there is no secret sharing or manual public-key distribution. Identity exposes `/.well-known/openid-configuration` and `/.well-known/jwks.json`; downstream services point `Authority` at identity and let JWT bearer middleware handle key fetch and rotation.
+
+```csharp
+// In any downstream service's Program.cs
+builder.AddJOrderJwtValidation();
+```
+
+For synchronous service-to-service calls that originate from a user request (for example, Order -> Catalogue), the **same JWT the user presented** is forwarded outbound. `BearerTokenForwardingHandler` in `JOrder.Common` does this automatically; attach it to any typed `HttpClient` registration:
+
+```csharp
+builder.Services.AddHttpClient<ICatalogueClient, CatalogueClient>()
+    .WithBearerForwarding();
+```
+
+`BearerTokenForwardingHandler` is registered by `AddJOrderCommon`, so no extra registration is needed. The downstream service validates that same token with its own JWT bearer middleware, without a second auth round-trip.
+
 ### Inter-service Communication
 
 Not all service-to-service calls are equal. JOrder distinguishes between calls that need an immediate response and those that are better handled asynchronously.
@@ -178,30 +202,30 @@ A message broker (e.g. RabbitMQ or Azure Service Bus) acts as the async backbone
 - [x] Initial project setup and architecture design
 - [ ] Implement core microservices
   - [ ] Identity Service
-    - JWT minting and auth
-    - User management (registration, login)
-    - Role assignment and permissions
+    - [ ] JWT minting and auth
+    - [ ] User management (registration, login)
+    - [ ] Role assignment and permissions
   - [ ] Catalogue Service
-    - Product management
-    - Category management
-    - Pricing metadata
-    - Product lifecycle
+    - [ ] Product management
+    - [ ] Category management
+    - [ ] Pricing metadata
+    - [ ] Product lifecycle
   - [ ] Inventory Service
-    - Stock availability
-    - Stock movement
-    - Reorder thresholds
+    - [ ] Stock availability
+    - [ ] Stock movement
+    - [ ] Reorder thresholds
   - [ ] Order Service
-    - Order creation and management
-    - Order status tracking
-    - Order validation and processing
+    - [ ] Order creation and management
+    - [ ] Order status tracking
+    - [ ] Order validation and processing
   - [ ] Invoice Service
-    - Invoice generation
-    - Invoice management
+    - [ ] Invoice generation
+    - [ ] Invoice management
   - [ ] Account Service
-    - Customer account management
-    - Billing and shipping information
-    - Account terms and conditions
-    - Credit limits and payment terms
+    - [ ] Customer account management
+    - [ ] Billing and shipping information
+    - [ ] Account terms and conditions
+    - [ ] Credit limits and payment terms
 - [ ] Implement API Gateway
 - [ ] Telemetry and monitoring
 - [ ] Security hardening

@@ -1,8 +1,8 @@
 # JOrder.Common
 
-`JOrder.Common` is the shared library for cross-cutting concerns used by JOrder services.
+`JOrder.Common` is the shared library for cross-cutting concerns across JOrder services.
 
-It provides:
+It includes:
 
 - Result/error primitives (`Result`, `Result<T>`, `Error`)
 - Startup and pipeline extensions (`AddJOrderCommon`, `MapDefaultEndpoints`, JWT setup helpers)
@@ -25,7 +25,7 @@ Target framework: `net10.0`
 
 ## Quick Start
 
-Typical usage in a service `Program.cs`:
+Typical setup in a service `Program.cs`:
 
 ```csharp
 using JOrder.Common.Extensions;
@@ -55,7 +55,7 @@ await app.RunAsync();
 - `[TransientService]`
 - `[SingletonService]`
 
-Each class is registered against its non-framework interfaces. If no such interface exists, it is registered as self.
+Each class is registered against its non-framework interfaces. If none exist, it is registered as self.
 
 ```csharp
 using JOrder.Common.Attributes;
@@ -96,8 +96,8 @@ In this example:
 
 ## Warmup Tasks
 
-Warmup tasks let a service do startup work (for example, loading key material, seeding caches, or checking dependencies)
-before the app starts accepting traffic.
+Warmup tasks let a service run startup work (for example, loading key material, seeding caches, or checking dependencies)
+before accepting traffic.
 
 1. Implement `IJOrderWarmupTask`.
 2. Register it with `AddJOrderWarmupTask<TWarmupTask>()`.
@@ -124,13 +124,13 @@ await app.RunWarmupTasksAsync();
 await app.RunAsync();
 ```
 
-Behavior notes:
+Behavior:
 
 - Warmup tasks are resolved from DI and executed sequentially.
-- If no tasks are registered, a single informational log entry is written.
+- If no tasks are registered, one informational log entry is written.
 - Duplicate registrations of the same task type are ignored.
 - Task execution is timed and logged per task.
-- The cancellation token passed to `RunWarmupTasksAsync` is forwarded to each task.
+- The cancellation token passed to `RunWarmupTasksAsync()` is forwarded to each task.
 
 ## Common Extension Methods
 
@@ -148,7 +148,7 @@ From `HostApplicationExtensions`:
 
 From `WebApplicationExtensions`:
 
-- `MapDefaultEndpoints()` - maps controllers, optional OpenAPI/Scalar in development, auth/authorization if registered, health probes, and request-origin logging middleware
+- `MapDefaultEndpoints()` - maps controllers, optional OpenAPI/Scalar in development, auth/authorization (if registered), health probes, and request-origin logging middleware
 - `RunWarmupTasksAsync()` - executes registered warmup tasks before serving traffic
 
 From `ControllerBaseExtensions`:
