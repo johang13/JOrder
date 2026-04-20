@@ -28,10 +28,6 @@ public class OAuthController(IOAuth2Service oauth2Service) : ControllerBase
     [Produces("application/json")]
     [ProducesResponseType(typeof(OAuthTokenResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Token([FromForm] OAuthTokenRequestDto request)
@@ -88,10 +84,6 @@ public class OAuthController(IOAuth2Service oauth2Service) : ControllerBase
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(OAuthErrorResponseDto), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Revoke([FromForm] OAuthRevocationRequestDto request)
     {
