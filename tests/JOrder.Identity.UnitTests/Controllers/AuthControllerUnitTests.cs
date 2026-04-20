@@ -2,9 +2,9 @@ using JOrder.Common.Abstractions.Results;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Auth.Results;
 using JOrder.Identity.Contracts.Requests;
+using JOrder.Identity.Contracts.Responses;
 using JOrder.Identity.Controllers;
 using JOrder.Identity.Services.Interfaces;
-using JOrder.Identity.Contracts.Response;
 using JOrder.Testing.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -20,6 +20,7 @@ public class AuthControllerUnitTests : ApiControllerUnitTestBase
     {
         _authService = Substitute.For<IAuthService>();
         _authController = new AuthController(_authService);
+        
         AttachHttpContext(_authController, userAgent: "JOrder.UnitTests/1.0", remoteIp: "127.0.0.1");
     }
 

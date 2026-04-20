@@ -30,15 +30,24 @@ builder.AddJOrderDatabase<JOrderIdentityDbContext>((_, options, dbOptions) =>
 
 // Add ASP.NET Identity
 builder.Services
-    .AddIdentityCore<User>()
+    .AddIdentityCore<User>(options =>
+    {
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
+    })
     .AddRoles<Role>()
     .AddEntityFrameworkStores<JOrderIdentityDbContext>();
 
 // Self-validate JWTs issued by this service (static key — no OIDC discovery needed)
 var signingConfig = builder.Configuration
     .GetSection(JwtSigningOptions.SectionName)
-    .Get<JwtSigningOptions>()!;
-var rsa = RSA.Create();
+    .Get<JwtSigningOptions>();
+
+if (signingConfig is null)
+    throw new InvalidOperationException("JWT signing configuration is missing");
+
+using var rsa = RSA.Create();
 rsa.ImportFromPem(File.ReadAllText(signingConfig.PrivateKeyPath));
 var publicKey = new RsaSecurityKey(rsa.ExportParameters(false));
 builder.AddJOrderJwtIssuerAuthentication(signingConfig.Issuer, signingConfig.Audience, publicKey);

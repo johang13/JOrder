@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace JOrder.Common.Middleware;
 
-public sealed class RequestOriginLoggingMiddlewareUnit(RequestDelegate next, ILogger<RequestOriginLoggingMiddlewareUnit> logger)
+public sealed class RequestOriginLoggingMiddleware(RequestDelegate next, ILogger<RequestOriginLoggingMiddleware> logger)
 {
     private static readonly HashSet<string> HealthProbePaths = new(StringComparer.OrdinalIgnoreCase)
     {

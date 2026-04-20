@@ -5,7 +5,7 @@
 ![Docker](https://img.shields.io/badge/Docker-containers-2496ED?logo=docker&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-local-326CE5?logo=kubernetes&logoColor=white)
 ![xUnit](https://img.shields.io/badge/Tests-xUnit-5D2D8E)
-[![Build and Test](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml)
+[![Build and Test (main)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/johang13/JOrder/actions/workflows/build-and-test.yml?query=branch%3Amain)
 
 ## Overview
 
@@ -22,7 +22,9 @@ JOrder is a sample microservices application built with .NET 10, designed as a s
 - **Clean shared library** — `JOrder.Common` houses cross-cutting concerns reused across all services
 - **Unit tested** — xUnit + NSubstitute, with a shared `JOrder.Testing` base for controller test infrastructure
 
-## Current State
+## High Level Solution Design
+
+### Current State
 
 ```mermaid
 flowchart LR
@@ -31,7 +33,7 @@ flowchart LR
     ID -. JWKS/OIDC .-> C
 ```
 
-## Target State - High Level Solution Design
+### Target State
 
 ```mermaid
 flowchart LR
@@ -84,13 +86,16 @@ JOrder/
 └── tests/
     ├── JOrder.Testing/         # Shared test infrastructure (ApiControllerUnitTestBase etc.)
     ├── JOrder.Common.UnitTests/
-    └── JOrder.Identity.UnitTests/
+    ├── JOrder.Identity.UnitTests/
+    └── JOrder.Identity.IntegrationTests/
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
+- Unix-based environment (macOS/Linux) with `make` installed
+- Windows users: use WSL2 (Ubuntu recommended) with `make` installed
 - [Docker](https://docs.docker.com/get-docker/) (with Docker daemon running)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) connected to a local cluster (e.g. [Docker Desktop](https://docs.docker.com/desktop/kubernetes/) or [kind](https://kind.sigs.k8s.io/))
 - A default ingress controller installed in the cluster

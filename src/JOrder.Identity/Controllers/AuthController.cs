@@ -3,7 +3,7 @@ using JOrder.Common.Extensions;
 using JOrder.Common.Attributes;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Contracts.Requests;
-using JOrder.Identity.Contracts.Response;
+using JOrder.Identity.Contracts.Responses;
 using JOrder.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

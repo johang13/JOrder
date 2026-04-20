@@ -29,10 +29,46 @@ jobs:
       - name: Build the project
         run: dotnet build --no-restore --configuration Release
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
           rm -rf ./test-results
-          dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx" --collect:"XPlat Code Coverage"
+          mapfile -t unit_projects < <(find tests -type f -name '*UnitTests.csproj' | sort)
+
+          if [ ${#unit_projects[@]} -eq 0 ]; then
+            echo "No unit test projects found."
+            exit 1
+          fi
+
+          for project in "${unit_projects[@]}"; do
+            echo "Running unit tests: $project"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --verbosity normal \
+              --results-directory ./test-results/unit \
+              --logger "trx" \
+              --collect:"XPlat Code Coverage"
+          done
+
+      - name: Run integration tests
+        run: |
+          mapfile -t integration_projects < <(find tests -type f -name '*IntegrationTests.csproj' | sort)
+
+          if [ ${#integration_projects[@]} -eq 0 ]; then
+            echo "No integration test projects found."
+            exit 1
+          fi
+
+          for project in "${integration_projects[@]}"; do
+            echo "Running integration tests: $project"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --verbosity normal \
+              --results-directory ./test-results/integration \
+              --logger "trx" \
+              --collect:"XPlat Code Coverage"
+          done
 
 
       - name: Generate test summary

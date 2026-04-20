@@ -46,7 +46,7 @@ public static class WebApplicationExtensions
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
         });
 
-        webApplication.UseMiddleware<RequestOriginLoggingMiddlewareUnit>();
+        webApplication.UseMiddleware<RequestOriginLoggingMiddleware>();
 
         // UseRateLimiter is safe to call unconditionally — it's a no-op when
         // no global limiter or policies have been registered via AddRateLimiter.

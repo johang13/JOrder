@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/JOrder.Identity.UnitTests/JOrder.Identity.UnitTests.csproj" />
+    <Project Path="tests/JOrder.Identity.IntegrationTests/JOrder.Identity.IntegrationTests.csproj" />
     <Project Path="tests\JOrder.Common.UnitTests\JOrder.Common.UnitTests.csproj" />
     <Project Path="tests/JOrder.Testing/JOrder.Testing.csproj" />
   </Folder>

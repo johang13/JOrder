@@ -1,6 +1,6 @@
-namespace JOrder.Identity.Contracts.Response;
+namespace JOrder.Identity.Contracts.Responses;
 
-public sealed record RefreshResponseDto
+public sealed record RegisterResponseDto
 {
     public required string AccessToken { get; init; }
     public DateTimeOffset AccessTokenExpiresAt { get; init; }

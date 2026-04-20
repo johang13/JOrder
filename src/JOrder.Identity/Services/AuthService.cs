@@ -141,10 +141,22 @@ public sealed class AuthService(
 
         // Rotate refresh token and mint new access token
         var (rawRefreshToken, newTokenHash, refreshTokenExpiresAt) = tokenMintingService.MintRefreshToken();
-        await refreshTokenService.RotateAsync(storedToken, newTokenHash, refreshTokenExpiresAt, command.IpAddress,
-            command.UserAgent, cancellationToken);
-
         var (accessToken, accessTokenExpiresAt) = tokenMintingService.MintAccessToken(user, roles);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await refreshTokenService.RotateAsync(storedToken, newTokenHash, refreshTokenExpiresAt, command.IpAddress,
+                command.UserAgent, cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Token refresh failed for {UserId}, rolling back transaction", user.Id);
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
 
         logger.LogInformation("Token refreshed for user {UserId}", user.Id);
         return new AuthTokenResult(accessToken, accessTokenExpiresAt, rawRefreshToken, refreshTokenExpiresAt);

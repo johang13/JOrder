@@ -1,4 +1,4 @@
-namespace JOrder.Identity.Contracts.Response;
+namespace JOrder.Identity.Contracts.Responses;
 
 public sealed record LoginResponseDto
 {

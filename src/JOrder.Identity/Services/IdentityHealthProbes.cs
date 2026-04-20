@@ -6,7 +6,7 @@ using JOrder.Identity.Services.Interfaces;
 namespace JOrder.Identity.Services;
 
 [ScopedService]
-public class IdentityHealthProbes(
+public sealed class IdentityHealthProbes(
     ISigningKeyMaterialService signingKeyMaterialService,
     JOrderIdentityDbContext dbContext) : IHealthProbes
 {

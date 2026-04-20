@@ -1,6 +1,6 @@
-namespace JOrder.Identity.Application.Auth.Results;
+namespace JOrder.Identity.Application.Users.Results;
 
-public record UserProfileResult(
+public sealed record UserProfileResult(
     Guid Id,
     string FirstName,
     string LastName,

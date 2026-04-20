@@ -1,4 +1,4 @@
-namespace JOrder.Identity.Application.Auth.Commands;
+namespace JOrder.Identity.Application.Users.Commands;
 
 public sealed record UpdateProfileCommand(
     Guid UserId,

@@ -2,6 +2,8 @@ using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Attributes;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Auth.Results;
+using JOrder.Identity.Application.Users.Commands;
+using JOrder.Identity.Application.Users.Results;
 using JOrder.Identity.Extensions;
 using JOrder.Identity.Models;
 using JOrder.Identity.Services.Interfaces;
@@ -10,7 +12,7 @@ using Microsoft.AspNetCore.Identity;
 namespace JOrder.Identity.Services;
 
 [ScopedService]
-public class UsersService(UserManager<User> userManager, ILogger<UsersService> logger): IUsersService
+public sealed class UsersService(UserManager<User> userManager, ILogger<UsersService> logger): IUsersService
 {
     public async Task<Result<UserProfileResult>> GetUserProfileAsync(UserProfileCommand command,
         CancellationToken cancellationToken)

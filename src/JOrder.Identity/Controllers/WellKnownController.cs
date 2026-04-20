@@ -1,5 +1,5 @@
+using JOrder.Identity.Contracts.Responses;
 using Microsoft.IdentityModel.JsonWebTokens;
-using JOrder.Identity.Contracts.Response;
 using JOrder.Identity.Options;
 using JOrder.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -26,7 +26,7 @@ public class WellKnownController(
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public ActionResult<OpenIdConfigurationResponseDto> GetOpenIdConfiguration()
     {
-        logger.LogInformation("Getting openid configuration");
+        logger.LogDebug("Getting openid configuration");
         
         var signingOptions = signingOptionsAccessor.Value;
 
@@ -66,7 +66,7 @@ public class WellKnownController(
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public ActionResult<JsonWebKeySetResponseDto> GetJsonWebKeySet()
     {
-        logger.LogInformation("Getting jwk set");
+        logger.LogDebug("Getting jwk set");
         
         return Ok(new JsonWebKeySetResponseDto
         {

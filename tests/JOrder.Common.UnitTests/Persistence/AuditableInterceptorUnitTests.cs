@@ -2,6 +2,7 @@ using JOrder.Common.Models.Interfaces;
 using JOrder.Common.Options;
 using JOrder.Common.Persistence;
 using JOrder.Common.Services.Interfaces;
+using JOrder.Testing.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -132,10 +133,5 @@ public class AuditableInterceptorUnitTests
         public string? UpdatedBy { get; set; }
     }
 
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        private readonly DateTimeOffset _now = now;
-        public override DateTimeOffset GetUtcNow() => _now;
-    }
 }
 
