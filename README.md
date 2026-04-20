@@ -17,7 +17,7 @@ JOrder is a sample microservices application built with .NET 10, designed as a s
 - **Attribute-driven DI** — `[ScopedService]`, `[SingletonService]`, `[TransientService]` for zero-boilerplate registration
 - **EF Core interceptors** — `AuditableInterceptor` automatically stamps `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`
 - **Rate limiting** — attribute-driven per-endpoint fixed-window and sliding-window limits via `[RateLimit]`
-- **JWT / OIDC** — Identity service mints JWTs and exposes a JWKS endpoint; downstream services validate via standard OIDC discovery
+- **OAuth2 / OIDC** — Identity service implements OAuth2 resource owner password credentials and refresh token flows, mints JWTs (RSA RS256), exposes JWKS/discovery endpoints; downstream services validate tokens via standard OIDC discovery
 - **Request logging middleware** — structured timing and origin logging, skipping health probe paths
 - **Clean shared library** — `JOrder.Common` houses cross-cutting concerns reused across all services
 - **Unit tested** — xUnit + NSubstitute, with a shared `JOrder.Testing` base for controller test infrastructure

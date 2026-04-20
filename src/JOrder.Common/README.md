@@ -196,7 +196,7 @@ Decorate endpoints or controllers with `[RateLimit]`:
 using JOrder.Common.Attributes;
 
 [RateLimit(permitLimit: 30, windowSeconds: 60, maxConcurrentRequests: 5)]
-public async Task<IActionResult> Login(LoginRequestDto request)
+public async Task<IActionResult> Token()
 {
 	// ...
 }

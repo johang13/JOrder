@@ -1,24 +1,69 @@
 using JOrder.Common.Abstractions.Results;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Models;
+using JOrder.Identity.Persistence;
 using JOrder.Identity.Services;
 using JOrder.Identity.UnitTests.TestInfrastructure;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace JOrder.Identity.UnitTests.Services;
 
-public class UsersServiceUnitTests
+public class UsersServiceUnitTests : IDisposable
 {
     private readonly UserManager<User> _userManager;
+    private readonly JOrderIdentityDbContext _dbContext;
+    private readonly SqliteConnection _connection;
     private readonly UsersService _usersService;
 
     public UsersServiceUnitTests()
     {
         _userManager = IdentityTestHelpers.CreateUserManager();
+        (_dbContext, _connection) = IdentityTestHelpers.CreateSqliteContext();
         var logger = Substitute.For<ILogger<UsersService>>();
-        _usersService = new UsersService(_userManager, logger);
+        _usersService = new UsersService(_userManager, _dbContext, logger);
+    }
+
+    public void Dispose()
+    {
+        _dbContext.Dispose();
+        _connection.Dispose();
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenUserAlreadyExists_ReturnsConflict()
+    {
+        var command = new RegisterCommand("John", "Doe", "john@example.com", "Password1!", "127.0.0.1", "UnitTest");
+        _userManager.FindByEmailAsync(command.Email).Returns(new User { Email = command.Email });
+
+        var result = await _usersService.RegisterAsync(command, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ErrorType.Conflict, result.Error.Type);
+        Assert.Equal("auth.user_exists", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenValidRequest_ReturnsSuccess()
+    {
+        var command = new RegisterCommand(
+            "John",
+            "Doe",
+            "john@example.com",
+            "Password1!",
+            "127.0.0.1",
+            "UnitTest");
+
+        _userManager.FindByEmailAsync(command.Email).Returns((User?)null);
+        _userManager.CreateAsync(Arg.Any<User>(), command.Password).Returns(IdentityResult.Success);
+        _userManager.AddToRoleAsync(Arg.Any<User>(), "Customer").Returns(IdentityResult.Success);
+
+        var result = await _usersService.RegisterAsync(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]

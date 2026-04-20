@@ -17,7 +17,7 @@ namespace JOrder.Identity.IntegrationTests.Services;
 public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixture)
 {
     [Fact]
-    public async Task RegisterAsync_Success_PersistsUserRoleAndRefreshToken()
+    public async Task RegisterAsync_Success_PersistsUserAndRole_WithoutIssuingRefreshToken()
     {
         await using var context = await fixture.CreateContextAsync(TimeProvider.System);
 
@@ -31,15 +31,10 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
         tokenMintingService.MintRefreshToken()
             .Returns(("raw-refresh", "refresh-hash", now.AddDays(7)));
 
-        var refreshTokenService = new RefreshTokenService(context, tokenMintingService, TimeProvider.System);
-
-        var service = new AuthService(
+        var service = new UsersService(
             userManager,
-            tokenMintingService,
-            refreshTokenService,
             context,
-            TimeProvider.System,
-            Substitute.For<ILogger<AuthService>>());
+            Substitute.For<ILogger<UsersService>>());
 
         var command = new RegisterCommand(
             "John",
@@ -59,10 +54,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
         var roles = await userManager.GetRolesAsync(user!);
         Assert.Contains("Customer", roles);
 
-        var savedToken = context.RefreshTokens.Single(rt => rt.UserId == user!.Id);
-        Assert.Equal("refresh-hash", savedToken.TokenHash);
-        Assert.Equal("127.0.0.1", savedToken.CreatedByIp);
-        Assert.Equal("IntegrationTests", savedToken.UserAgent);
+        Assert.False(await context.RefreshTokens.AnyAsync(rt => rt.UserId == user!.Id));
     }
 
     [Fact]
@@ -102,13 +94,10 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
         var tokenMintingService = Substitute.For<ITokenMintingService>();
         var refreshTokenService = new RefreshTokenService(context, tokenMintingService, fixedTimeProvider);
 
-        var service = new AuthService(
+        var service = new SessionService(
             userManager,
-            tokenMintingService,
             refreshTokenService,
-            context,
-            fixedTimeProvider,
-            Substitute.For<ILogger<AuthService>>());
+            Substitute.For<ILogger<SessionService>>());
 
         var result = await service.LogoutAllAsync(new LogoutAllCommand(user.Id));
 
@@ -132,7 +121,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
     {
         await using var context = await fixture.CreateContextAsync(TimeProvider.System);
 
-        var service = CreateAuthService(context, TimeProvider.System, out var userManager, out var tokenMintingService);
+        var service = CreateOAuth2Service(context, TimeProvider.System, out var userManager, out var tokenMintingService);
 
         var user = PostgresIntegrationFixture.CreateUser("login.success@example.com");
         var created = await userManager.CreateAsync(user, "Password1!");
@@ -173,7 +162,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
 
         await using var context = await fixture.CreateContextAsync(fixedTimeProvider);
 
-        var service = CreateAuthService(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
+        var service = CreateOAuth2Service(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
 
         var user = PostgresIntegrationFixture.CreateUser("refresh.success@example.com");
         var created = await userManager.CreateAsync(user, "Password1!");
@@ -221,14 +210,14 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
     }
 
     [Fact]
-    public async Task LogoutAsync_Success_RevokesMatchingRefreshToken()
+    public async Task RevokeAsync_Success_RevokesMatchingRefreshToken()
     {
         var now = DateTimeOffset.UtcNow;
         var fixedTimeProvider = new FixedTimeProvider(now);
 
         await using var context = await fixture.CreateContextAsync(fixedTimeProvider);
 
-        var service = CreateAuthService(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
+        var service = CreateOAuth2Service(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
 
         var user = PostgresIntegrationFixture.CreateUser("logout.success@example.com");
         var created = await userManager.CreateAsync(user, "Password1!");
@@ -247,7 +236,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
 
         tokenMintingService.HashToken("raw-logout-token").Returns("logout-refresh-hash");
 
-        var result = await service.LogoutAsync(new LogoutCommand("raw-logout-token"));
+        var result = await service.RevokeAsync(new LogoutCommand("raw-logout-token"));
 
         Assert.True(result.IsSuccess);
 
@@ -264,7 +253,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
 
         await using var context = await fixture.CreateContextAsync(fixedTimeProvider);
 
-        var service = CreateAuthService(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
+        var service = CreateOAuth2Service(context, fixedTimeProvider, out var userManager, out var tokenMintingService);
 
         var user = PostgresIntegrationFixture.CreateUser("refresh.replay@example.com");
         var created = await userManager.CreateAsync(user, "Password1!");
@@ -308,7 +297,7 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
         Assert.Equal(2, await context.RefreshTokens.CountAsync(rt => rt.UserId == user.Id));
     }
 
-    private static AuthService CreateAuthService(
+    private static OAuth2Service CreateOAuth2Service(
         JOrderIdentityDbContext context,
         TimeProvider timeProvider,
         out UserManager<User> userManager,
@@ -320,13 +309,13 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
         tokenMintingService = Substitute.For<ITokenMintingService>();
         var refreshTokenService = new RefreshTokenService(context, tokenMintingService, timeProvider);
 
-        return new AuthService(
+        return new OAuth2Service(
             userManager,
             tokenMintingService,
             refreshTokenService,
             context,
             timeProvider,
-            Substitute.For<ILogger<AuthService>>());
+            Substitute.For<ILogger<OAuth2Service>>());
     }
 
 }

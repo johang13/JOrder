@@ -53,14 +53,14 @@ public class WellKnownControllerUnitTests : ApiControllerUnitTestBase
 
         Assert.Equal(configuredIssuer, payload.Issuer);
         Assert.Equal($"{normalizedIssuer}/.well-known/jwks.json", payload.JwksUri);
-        Assert.Equal($"{normalizedIssuer}/Auth/login", payload.TokenEndpoint);
+        Assert.Equal($"{normalizedIssuer}/oauth2/token", payload.TokenEndpoint);
         Assert.Equal($"{normalizedIssuer}/Users/me", payload.UserInfoEndpoint);
-        Assert.Equal($"{normalizedIssuer}/Auth/logout", payload.RevocationEndpoint);
-        Assert.Equal($"{normalizedIssuer}/Auth/logout-all", payload.EndSessionEndpoint);
+        Assert.Equal($"{normalizedIssuer}/oauth2/revoke", payload.RevocationEndpoint);
+        Assert.Equal($"{normalizedIssuer}/Session/logout-all", payload.EndSessionEndpoint);
         Assert.Equal(["public"], payload.SubjectTypesSupported);
         Assert.Equal(["RS256"], payload.IdTokenSigningAlgValuesSupported);
         Assert.Equal(["password", "refresh_token"], payload.GrantTypesSupported);
-        Assert.Equal(["token"], payload.ResponseTypesSupported);
+        Assert.Empty(payload.ResponseTypesSupported);
         Assert.Equal(["openid", "profile", "email", "roles", "offline_access"], payload.ScopesSupported);
         Assert.Equal(["none"], payload.TokenEndpointAuthMethodsSupported);
         Assert.Equal(
@@ -93,7 +93,7 @@ public class WellKnownControllerUnitTests : ApiControllerUnitTestBase
 
         Assert.Equal(configuredIssuer, payload.Issuer);
         Assert.Equal($"{normalizedIssuer}/.well-known/jwks.json", payload.JwksUri);
-        Assert.Equal($"{normalizedIssuer}/Auth/login", payload.TokenEndpoint);
+        Assert.Equal($"{normalizedIssuer}/oauth2/token", payload.TokenEndpoint);
         Assert.Equal(["ES256"], payload.IdTokenSigningAlgValuesSupported);
     }
 

@@ -43,7 +43,7 @@ public static class ServiceCollectionExtensions
                 document.Info.Title = title;
                 return Task.CompletedTask;
             });
-            options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+            options.AddDocumentTransformer<SecuritySchemeTransformer>();
         });
         return services;
     }

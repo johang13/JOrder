@@ -36,13 +36,13 @@ public class WellKnownController(
         {
             Issuer = signingOptions.Issuer,
             JwksUri = $"{issuer}/.well-known/jwks.json",
-            TokenEndpoint = $"{issuer}/Auth/login",
+            TokenEndpoint = $"{issuer}/oauth2/token",
             UserInfoEndpoint = $"{issuer}/Users/me",
-            RevocationEndpoint = $"{issuer}/Auth/logout",
-            EndSessionEndpoint = $"{issuer}/Auth/logout-all",
+            RevocationEndpoint = $"{issuer}/oauth2/revoke",
+            EndSessionEndpoint = $"{issuer}/Session/logout-all",
             IdTokenSigningAlgValuesSupported = [signingOptions.Algorithm],
             GrantTypesSupported = ["password", "refresh_token"],
-            ResponseTypesSupported = ["token"],
+            ResponseTypesSupported = [],
             ScopesSupported = ["openid", "profile", "email", "roles", "offline_access"],
             TokenEndpointAuthMethodsSupported = ["none"],
             ClaimsSupported =

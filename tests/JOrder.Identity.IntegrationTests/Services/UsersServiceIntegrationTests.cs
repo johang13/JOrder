@@ -168,7 +168,7 @@ public sealed class UsersServiceIntegrationTests(PostgresIntegrationFixture fixt
     {
         var userStore = new UserStore<User, Role, JOrderIdentityDbContext, Guid>(context);
         var userManager = IdentityIntegrationTestHelpers.CreateUserManager(userStore);
-        var service = new UsersService(userManager, Substitute.For<ILogger<UsersService>>());
+        var service = new UsersService(userManager, context, Substitute.For<ILogger<UsersService>>());
         return (service, userManager);
     }
 }

@@ -1,17 +1,72 @@
 using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Attributes;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Application.Users.Results;
 using JOrder.Identity.Extensions;
 using JOrder.Identity.Models;
+using JOrder.Identity.Persistence;
 using JOrder.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 
 namespace JOrder.Identity.Services;
 
 [ScopedService]
-public sealed class UsersService(UserManager<User> userManager, ILogger<UsersService> logger): IUsersService
+public sealed class UsersService(
+    UserManager<User> userManager,
+    JOrderIdentityDbContext dbContext,
+    ILogger<UsersService> logger) : IUsersService
 {
+    public async Task<Result> RegisterAsync(RegisterCommand command, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Registering user: {Email}", command.Email);
+
+        if (await userManager.FindByEmailAsync(command.Email) is not null)
+        {
+            logger.LogInformation("User with email {Email} already exists", command.Email);
+            return Error.Conflict("auth.user_exists", "A user with this email already exists.");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var user = new User
+            {
+                FirstName = command.FirstName,
+                LastName = command.LastName,
+                Email = command.Email,
+                UserName = command.Email,
+            };
+
+            var createResult = await userManager.CreateAsync(user, command.Password);
+            if (!createResult.Succeeded)
+            {
+                logger.LogInformation("User creation failed for user: {Email}", command.Email);
+                return createResult.ToValidationError("auth.register.invalid", "User creation failed.");
+            }
+
+            logger.LogInformation("User created: {Email}", command.Email);
+
+            var roleResult = await userManager.AddToRoleAsync(user, "Customer");
+            if (!roleResult.Succeeded)
+            {
+                logger.LogInformation("Adding role to user failed for user: {Email}", command.Email);
+                return roleResult.ToValidationError("auth.register.role_assignment_failed", "Failed to assign role to user.");
+            }
+
+            logger.LogInformation("Assigned role 'Customer' to user: {Email}", command.Email);
+
+            await transaction.CommitAsync(cancellationToken);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Registration failed for {Email}, rolling back transaction", command.Email);
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<Result<UserProfileResult>> GetUserProfileAsync(UserProfileCommand command,
         CancellationToken cancellationToken)
     {

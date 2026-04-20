@@ -1,12 +1,39 @@
 # JOrder.Identity
 
-`JOrder.Identity` is the authentication and user-management service for JOrder.
+`JOrder.Identity` is the authentication and user-management service for JOrder, implementing OAuth2 and OpenID Connect (OIDC) standard flows.
 
-Current implementation includes:
+## OAuth2 Flows
 
-- User registration and login
+**Resource Owner Password Credentials** (`POST /oauth2/token` with `grant_type=password`)
+- Username/password authentication
+- Issues access token (JWT) and refresh token with rotation
+- Complies with RFC 6749 token endpoint specification
+
+**Refresh Token** (`POST /oauth2/token` with `grant_type=refresh_token`)
+- Exchanges refresh token for new access/refresh token pair
+- Implements token rotation: new refresh token issued, old one invalidated
+- Detects replay attacks (expired/revoked/inactive tokens rejected)
+
+**Token Revocation** (`POST /oauth2/revoke`)
+- Idempotent revocation endpoint per RFC 7009
+- Revokes specified refresh token immediately
+- Complies with OAuth2 revocation spec
+
+**Authorization Code Initiation** (`GET /oauth2/authorize`)
+- Starts OAuth2 Authorization Code flow for interactive clients/tools
+- Validates standard authorization request parameters
+- Redirects authenticated users with an authorization code
+
+**Interactive Login Helper** (`GET /oauth2/login`)
+- Provides login guidance for documentation and interactive tooling
+- Supports Scalar/OpenAPI-driven authorization workflows
+
+## Additional Features
+
+- User registration (returns HTTP 201, no tokens)
 - JWT access token minting (RSA, RS256)
 - Refresh-token rotation and revocation
+- Session management (logout-all revokes all active tokens)
 - OIDC discovery and JWKS endpoints for downstream validation
 - Authenticated user profile read/update and password change
 
@@ -19,20 +46,26 @@ At startup, the service:
 3. Loads JWT signing options and configures bearer validation for self-issued tokens
 4. Runs warmup tasks (including signing key material warmup)
 
+The generated OpenAPI document includes OAuth2 security scheme metadata (Authorization Code + token endpoints), enabling interactive authorization from Scalar and compatible API documentation tools.
+
 ## API Endpoints
 
 Base route prefixes are `[Route("[controller]")]` for controllers.
 
-### Auth
+### OAuth2
 
-- `POST /Auth/register` (anonymous, rate-limited)
-- `POST /Auth/login` (anonymous, rate-limited)
-- `POST /Auth/refresh` (anonymous, rate-limited)
-- `POST /Auth/logout` (anonymous, idempotent)
-- `POST /Auth/logout-all` (authorized)
+- `POST /oauth2/token` (anonymous, form-encoded OAuth token endpoint; supports `password` and `refresh_token` grants)
+- `POST /oauth2/revoke` (anonymous, form-encoded OAuth revocation endpoint; idempotent)
+- `GET /oauth2/authorize` (anonymous, OAuth2 authorization endpoint for Authorization Code flow initiation)
+- `GET /oauth2/login` (anonymous, interactive login helper for documentation/tooling flows)
+
+### Session
+
+- `POST /Session/logout-all` (authorized)
 
 ### Users
 
+- `POST /Users` (anonymous, rate-limited registration)
 - `GET /Users/me` (authorized)
 - `PATCH /Users/me` (authorized)
 - `POST /Users/me/change-password` (authorized)
