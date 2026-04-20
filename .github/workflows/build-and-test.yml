@@ -133,6 +133,8 @@ jobs:
           reportgenerator \
             "-reports:./test-results/**/coverage.cobertura.xml" \
             "-targetdir:./test-results/coverage-report" \
+            "-assemblyfilters:+JOrder.*;-*.UnitTests;-*.IntegrationTests;-JOrder.Testing" \
+            "-classfilters:+JOrder.*;-Program;-*.Program;-*.Migrations.*" \
             "-reporttypes:MarkdownSummaryGithub;TextSummary"
 
           if [ -f ./test-results/coverage-report/SummaryGithub.md ]; then
