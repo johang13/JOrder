@@ -11,8 +11,7 @@ public static class HttpClientBuilderExtensions
     /// <summary>
     /// Attaches <see cref="BearerTokenForwardingHandler"/> to this <see cref="HttpClient"/>
     /// registration so the incoming user token is forwarded on every outbound request.
-    /// Requires <see cref="HostApplicationExtensions.AddJOrderBearerForwarding"/> (or
-    /// <see cref="HostApplicationExtensions.AddJOrderCommon"/> which calls it) to have been
+    /// Requires <see cref="HostApplicationExtensions.AddJOrderBearerForwarding"/> to have been
     /// called first.
     /// </summary>
     /// <example>

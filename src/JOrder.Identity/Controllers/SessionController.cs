@@ -21,7 +21,6 @@ public class SessionController(ISessionService sessionService) : ControllerBase
     /// <response code="500">Unexpected server error.</response>
     [HttpPost("logout-all")]
     [Authorize]
-    [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]

@@ -127,13 +127,15 @@ public class OAuthController(IOAuth2Service oauth2Service) : ControllerBase
 
     private IActionResult ToOAuthError(Error error)
     {
+        // Map our internal error types to appropriate OAuth 2.0 error responses.
+        // RFC 6749 specifies to return 400 for these errors
         return error.Type switch
         {
-            ErrorType.Validation => OAuthError("invalid_request", error.Description, StatusCodes.Status400BadRequest),
-            ErrorType.Unauthorized => OAuthError("invalid_grant", error.Description, StatusCodes.Status401Unauthorized),
-            ErrorType.Forbidden => OAuthError("invalid_scope", error.Description, StatusCodes.Status403Forbidden),
-            ErrorType.NotFound => OAuthError("invalid_request", error.Description, StatusCodes.Status404NotFound),
-            ErrorType.Conflict => OAuthError("invalid_request", error.Description, StatusCodes.Status409Conflict),
+            ErrorType.Validation => OAuthError("invalid_request", error.Description),
+            ErrorType.Unauthorized => OAuthError("invalid_grant", error.Description),
+            ErrorType.Forbidden => OAuthError("invalid_scope", error.Description),
+            ErrorType.NotFound => OAuthError("invalid_request", error.Description),
+            ErrorType.Conflict => OAuthError("invalid_request", error.Description),
             _ => OAuthError("server_error", error.Description, StatusCodes.Status500InternalServerError),
         };
     }
