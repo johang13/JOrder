@@ -116,29 +116,43 @@ jobs:
               f.writelines(lines)
           EOF
 
-      - name: Generate merged coverage report
+      - name: Detect coverage files
+        id: detect_coverage
         if: always()
         run: |
           mapfile -t coverage_files < <(find ./test-results -type f -name 'coverage.cobertura.xml' | sort)
-
           if [ ${#coverage_files[@]} -eq 0 ]; then
+            echo "HAS_COVERAGE=false" >> "$GITHUB_ENV"
+            echo "has_coverage=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "HAS_COVERAGE=true" >> "$GITHUB_ENV"
+            echo "has_coverage=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate merged coverage report
+        if: always() && steps.detect_coverage.outputs.has_coverage == 'true'
+        uses: danielpalme/ReportGenerator-GitHub-Action@5
+        with:
+          reports: ./test-results/**/coverage.cobertura.xml
+          targetdir: ./test-results/coverage-report
+          reporttypes: MarkdownSummaryGithub;TextSummary
+          assemblyfilters: +JOrder.*;-*.UnitTests;-*.IntegrationTests;-JOrder.Testing
+          classfilters: +JOrder.*;-Program;-*.Program;-*.Migrations.*
+
+      - name: Append coverage summary
+        if: always()
+        run: |
+          if [ "${HAS_COVERAGE}" != "true" ]; then
             echo "## Code Coverage" >> "$GITHUB_STEP_SUMMARY"
             echo "No coverage files were produced." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.*
-          export PATH="$PATH:$HOME/.dotnet/tools"
-
-          reportgenerator \
-            "-reports:./test-results/**/coverage.cobertura.xml" \
-            "-targetdir:./test-results/coverage-report" \
-            "-assemblyfilters:+JOrder.*;-*.UnitTests;-*.IntegrationTests;-JOrder.Testing" \
-            "-classfilters:+JOrder.*;-Program;-*.Program;-*.Migrations.*" \
-            "-reporttypes:MarkdownSummaryGithub;TextSummary"
-
           if [ -f ./test-results/coverage-report/SummaryGithub.md ]; then
             cat ./test-results/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Code Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "Coverage report was generated, but markdown summary file was not found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload test results
