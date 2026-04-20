@@ -1,8 +1,8 @@
 # JOrder.Common
 
-`JOrder.Common` is the shared library for cross-cutting concerns used by JOrder services.
+`JOrder.Common` is the shared library for cross-cutting concerns across JOrder services.
 
-It provides:
+It includes:
 
 - Result/error primitives (`Result`, `Result<T>`, `Error`)
 - Startup and pipeline extensions (`AddJOrderCommon`, `MapDefaultEndpoints`, JWT setup helpers)
@@ -25,7 +25,7 @@ Target framework: `net10.0`
 
 ## Quick Start
 
-Typical usage in a service `Program.cs`:
+Typical setup in a service `Program.cs`:
 
 ```csharp
 using JOrder.Common.Extensions;
@@ -34,6 +34,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddJOrderCommon();
+builder.AddJOrderBearerForwarding();
 builder.AddJOrderRateLimiting();
 
 builder.AddJOrderDatabase<MyDbContext>((_, options, dbOptions) =>
@@ -55,7 +56,7 @@ await app.RunAsync();
 - `[TransientService]`
 - `[SingletonService]`
 
-Each class is registered against its non-framework interfaces. If no such interface exists, it is registered as self.
+Each class is registered against its non-framework interfaces. If none exist, it is registered as self.
 
 ```csharp
 using JOrder.Common.Attributes;
@@ -96,8 +97,8 @@ In this example:
 
 ## Warmup Tasks
 
-Warmup tasks let a service do startup work (for example, loading key material, seeding caches, or checking dependencies)
-before the app starts accepting traffic.
+Warmup tasks let a service run startup work (for example, loading key material, seeding caches, or checking dependencies)
+before accepting traffic.
 
 1. Implement `IJOrderWarmupTask`.
 2. Register it with `AddJOrderWarmupTask<TWarmupTask>()`.
@@ -124,19 +125,39 @@ await app.RunWarmupTasksAsync();
 await app.RunAsync();
 ```
 
-Behavior notes:
+Behavior:
 
 - Warmup tasks are resolved from DI and executed sequentially.
-- If no tasks are registered, a single informational log entry is written.
+- If no tasks are registered, one informational log entry is written.
 - Duplicate registrations of the same task type are ignored.
 - Task execution is timed and logged per task.
-- The cancellation token passed to `RunWarmupTasksAsync` is forwarded to each task.
+- The cancellation token passed to `RunWarmupTasksAsync()` is forwarded to each task.
+
+## EF Core Auditing
+
+`AuditableInterceptor` is an EF Core `SaveChangesInterceptor` that automatically stamps audit fields before each save.
+
+It is registered automatically by `AddJOrderDatabase<TDbContext>(...)` — no manual setup is needed.
+
+**On `Added` entities:**
+
+- `CreatedAt` is set to `TimeProvider.GetUtcNow()`
+- `CreatedById` is set to `ICurrentUser.Id`
+- `CreatedBy` is set to the current user's email, or the service name if the request is unauthenticated
+
+**On `Modified` entities:**
+
+- `UpdatedAt`, `UpdatedById`, and `UpdatedBy` are set using the same logic
+- `CreatedAt`, `CreatedBy`, and `CreatedById` are protected — EF Core is prevented from overwriting them
+
+Entities must implement `IAuditable` (via `AuditableEntity`) to be tracked. Plain `Entity` subclasses are ignored by the interceptor.
 
 ## Common Extension Methods
 
 From `HostApplicationExtensions`:
 
-- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, `HttpContextAccessor`, controllers, and OpenAPI
+- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, and web-only services (`HttpContextAccessor`, controllers, OpenAPI, `ICurrentUser`)
+- `AddJOrderBearerForwarding()` - registers `BearerTokenForwardingHandler` for outbound token propagation
 - `AddJOrderRateLimiting()` - enables global per-IP rate limiting driven by `[RateLimit]`
 - `AddJOrderOptions<TOptions>()` - binds and validates options on startup
 - `AddJOrderDatabase<TDbContext>(...)` - registers DbContext and auditing interceptor
@@ -148,7 +169,7 @@ From `HostApplicationExtensions`:
 
 From `WebApplicationExtensions`:
 
-- `MapDefaultEndpoints()` - maps controllers, optional OpenAPI/Scalar in development, auth/authorization if registered, health probes, and request-origin logging middleware
+- `MapDefaultEndpoints()` - maps controllers, optional OpenAPI/Scalar in development, auth/authorization (if registered), health probes, and request-origin logging middleware
 - `RunWarmupTasksAsync()` - executes registered warmup tasks before serving traffic
 
 From `ControllerBaseExtensions`:
@@ -196,7 +217,7 @@ Decorate endpoints or controllers with `[RateLimit]`:
 using JOrder.Common.Attributes;
 
 [RateLimit(permitLimit: 30, windowSeconds: 60, maxConcurrentRequests: 5)]
-public async Task<IActionResult> Login(LoginRequestDto request)
+public async Task<IActionResult> Token()
 {
 	// ...
 }

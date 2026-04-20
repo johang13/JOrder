@@ -1,4 +1,5 @@
 using JOrder.Common.Abstractions.Results;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Application.Users.Results;
 using JOrder.Identity.Contracts.Requests;
@@ -6,6 +7,7 @@ using JOrder.Identity.Contracts.Responses;
 using JOrder.Identity.Controllers;
 using JOrder.Identity.Services.Interfaces;
 using JOrder.Testing.Controllers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 
@@ -22,6 +24,55 @@ public class UsersControllerUnitTests : ApiControllerUnitTestBase
         _usersController = new UsersController(_usersService);
 
         AttachHttpContext(_usersController, userAgent: "JOrder.UnitTests/1.0", remoteIp: "127.0.0.1");
+    }
+
+    [Fact]
+    public async Task Register_Success_ReturnsCreated()
+    {
+        var request = new RegisterRequestDto
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john@example.com",
+            Password = "Password1!"
+        };
+
+        _usersService.RegisterAsync(Arg.Any<RegisterCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+
+        var result = await _usersController.Register(request);
+
+        var created = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status201Created, created.StatusCode);
+
+        await _usersService.Received(1).RegisterAsync(
+            Arg.Is<RegisterCommand>(c =>
+                c.FirstName == "John" &&
+                c.LastName == "Doe" &&
+                c.Email == "john@example.com" &&
+                c.Password == "Password1!" &&
+                c.IpAddress == "127.0.0.1" &&
+                c.UserAgent == "JOrder.UnitTests/1.0"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Register_Failure_ReturnsConflict()
+    {
+        var request = new RegisterRequestDto
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john@example.com",
+            Password = "Password1!"
+        };
+
+        _usersService.RegisterAsync(Arg.Any<RegisterCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Error.Conflict("auth.user_exists", "A user with this email already exists."));
+
+        var result = await _usersController.Register(request);
+
+        Assert.IsType<ConflictObjectResult>(result);
     }
 
     [Fact]

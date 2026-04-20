@@ -12,25 +12,25 @@ using NSubstitute;
 
 namespace JOrder.Identity.UnitTests.Services;
 
-public class AuthServiceUnitTests : IDisposable
+public class OAuth2ServiceUnitTests : IDisposable
 {
     private readonly UserManager<User> _userManager;
     private readonly ITokenMintingService _tokenMintingService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly JOrderIdentityDbContext _dbContext;
     private readonly SqliteConnection _connection;
-    private readonly AuthService _authService;
+    private readonly OAuth2Service _oauth2Service;
     private readonly DateTimeOffset _now = new(2026, 4, 19, 12, 0, 0, TimeSpan.Zero);
 
-    public AuthServiceUnitTests()
+    public OAuth2ServiceUnitTests()
     {
         _userManager = IdentityTestHelpers.CreateUserManager();
         _tokenMintingService = Substitute.For<ITokenMintingService>();
         _refreshTokenService = Substitute.For<IRefreshTokenService>();
         (_dbContext, _connection) = IdentityTestHelpers.CreateSqliteContext();
 
-        var logger = Substitute.For<ILogger<AuthService>>();
-        _authService = new AuthService(
+        var logger = Substitute.For<ILogger<OAuth2Service>>();
+        _oauth2Service = new OAuth2Service(
             _userManager,
             _tokenMintingService,
             _refreshTokenService,
@@ -46,79 +46,13 @@ public class AuthServiceUnitTests : IDisposable
     }
 
     [Fact]
-    public async Task RegisterAsync_WhenUserAlreadyExists_ReturnsConflict()
-    {
-        // Arrange
-        var command = new RegisterCommand("John", "Doe", "john@example.com", "Password1!", "127.0.0.1", "UnitTest");
-        _userManager.FindByEmailAsync(command.Email).Returns(new User { Email = command.Email });
-
-        // Act
-        var result = await _authService.RegisterAsync(command, CancellationToken.None);
-
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Equal(ErrorType.Conflict, result.Error.Type);
-        Assert.Equal("auth.user_exists", result.Error.Code);
-    }
-
-    [Fact]
-    public async Task RegisterAsync_WhenValidRequest_ReturnsTokensAndSavesRefreshToken()
-    {
-        // Arrange
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "john@example.com",
-            UserName = "john@example.com",
-            IsActive = true
-        };
-
-        var command = new RegisterCommand(
-            "John",
-            "Doe",
-            "john@example.com",
-            "Password1!",
-            "127.0.0.1",
-            "UnitTest");
-
-        _userManager.FindByEmailAsync(command.Email).Returns((User?)null);
-        _userManager.CreateAsync(Arg.Any<User>(), command.Password).Returns(IdentityResult.Success);
-        _userManager.AddToRoleAsync(Arg.Any<User>(), "Customer").Returns(IdentityResult.Success);
-        _userManager.GetRolesAsync(Arg.Any<User>()).Returns(["Customer"]);
-
-        _tokenMintingService.MintAccessToken(Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>())
-            .Returns(("access-token", _now.AddMinutes(15)));
-        _tokenMintingService.MintRefreshToken()
-            .Returns(("refresh-raw", "refresh-hash", _now.AddDays(7)));
-
-        // Act
-        var result = await _authService.RegisterAsync(command, CancellationToken.None);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.Equal("access-token", result.Value.AccessToken);
-        Assert.Equal("refresh-raw", result.Value.RefreshToken);
-
-        await _refreshTokenService.Received(1).SaveAsync(
-            Arg.Any<Guid>(),
-            "refresh-hash",
-            _now.AddDays(7),
-            "127.0.0.1",
-            "UnitTest",
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task LoginAsync_InvalidCredentials_ReturnsUnauthorized()
     {
-        // Arrange
         var command = new LoginCommand("john@example.com", "wrong-password", "127.0.0.1", "UnitTest");
         _userManager.FindByEmailAsync(command.Email).Returns((User?)null);
 
-        // Act
-        var result = await _authService.LoginAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.LoginAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsFailure);
         Assert.Equal(ErrorType.Unauthorized, result.Error.Type);
         Assert.Equal("auth.invalid_credentials", result.Error.Code);
@@ -127,7 +61,6 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task LoginAsync_WhenCredentialsValid_ReturnsTokensAndSavesRefreshToken()
     {
-        // Arrange
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -147,10 +80,8 @@ public class AuthServiceUnitTests : IDisposable
         _tokenMintingService.MintRefreshToken()
             .Returns(("refresh-raw", "refresh-hash", _now.AddDays(7)));
 
-        // Act
-        var result = await _authService.LoginAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.LoginAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("access-token", result.Value.AccessToken);
         Assert.Equal("refresh-raw", result.Value.RefreshToken);
@@ -167,15 +98,12 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task RefreshAsync_WhenTokenNotFound_ReturnsUnauthorized()
     {
-        // Arrange
         var command = new RefreshCommand("raw-token", "127.0.0.1", "UnitTest");
         _refreshTokenService.FindByRawTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
             .Returns((RefreshToken?)null);
 
-        // Act
-        var result = await _authService.RefreshAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RefreshAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("auth.refresh.invalid", result.Error.Code);
     }
@@ -183,7 +111,6 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task RefreshAsync_WhenTokenRevoked_ReturnsUnauthorized()
     {
-        // Arrange
         var command = new RefreshCommand("raw-token", "127.0.0.1", "UnitTest");
         _refreshTokenService.FindByRawTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
             .Returns(new RefreshToken
@@ -196,10 +123,8 @@ public class AuthServiceUnitTests : IDisposable
                 UserAgent = "UnitTest"
             });
 
-        // Act
-        var result = await _authService.RefreshAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RefreshAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("auth.refresh.revoked", result.Error.Code);
     }
@@ -207,7 +132,6 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task RefreshAsync_WhenTokenExpired_ReturnsUnauthorized()
     {
-        // Arrange
         var command = new RefreshCommand("raw-token", "127.0.0.1", "UnitTest");
         _refreshTokenService.FindByRawTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
             .Returns(new RefreshToken
@@ -219,10 +143,8 @@ public class AuthServiceUnitTests : IDisposable
                 UserAgent = "UnitTest"
             });
 
-        // Act
-        var result = await _authService.RefreshAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RefreshAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("auth.refresh.expired", result.Error.Code);
     }
@@ -230,7 +152,6 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task RefreshAsync_WhenUserInactive_ReturnsUnauthorized()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var command = new RefreshCommand("raw-token", "127.0.0.1", "UnitTest");
 
@@ -251,10 +172,8 @@ public class AuthServiceUnitTests : IDisposable
             IsActive = false
         });
 
-        // Act
-        var result = await _authService.RefreshAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RefreshAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("auth.refresh.invalid", result.Error.Code);
     }
@@ -262,7 +181,6 @@ public class AuthServiceUnitTests : IDisposable
     [Fact]
     public async Task RefreshAsync_Success_RotatesTokenAndReturnsNewTokens()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var user = new User { Id = userId, Email = "john@example.com", UserName = "john@example.com", IsActive = true };
         var storedToken = new RefreshToken
@@ -286,10 +204,8 @@ public class AuthServiceUnitTests : IDisposable
         _tokenMintingService.MintAccessToken(user, Arg.Any<IReadOnlyCollection<string>>())
             .Returns(("new-access-token", _now.AddMinutes(15)));
 
-        // Act
-        var result = await _authService.RefreshAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RefreshAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("new-access-token", result.Value.AccessToken);
         Assert.Equal("new-raw-refresh", result.Value.RefreshToken);
@@ -304,25 +220,21 @@ public class AuthServiceUnitTests : IDisposable
     }
 
     [Fact]
-    public async Task LogoutAsync_WhenTokenMissing_StillReturnsSuccess()
+    public async Task RevokeAsync_WhenTokenMissing_StillReturnsSuccess()
     {
-        // Arrange
         var command = new LogoutCommand("missing-token");
         _refreshTokenService.FindByRawTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
             .Returns((RefreshToken?)null);
 
-        // Act
-        var result = await _authService.LogoutAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RevokeAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsSuccess);
         await _refreshTokenService.DidNotReceive().RevokeAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task LogoutAsync_WhenTokenExists_RevokesTokenAndReturnsSuccess()
+    public async Task RevokeAsync_WhenTokenExists_RevokesToken()
     {
-        // Arrange
         var token = new RefreshToken
         {
             UserId = Guid.NewGuid(),
@@ -336,45 +248,9 @@ public class AuthServiceUnitTests : IDisposable
         _refreshTokenService.FindByRawTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
             .Returns(token);
 
-        // Act
-        var result = await _authService.LogoutAsync(command, CancellationToken.None);
+        var result = await _oauth2Service.RevokeAsync(command, CancellationToken.None);
 
-        // Assert
         Assert.True(result.IsSuccess);
         await _refreshTokenService.Received(1).RevokeAsync(token, Arg.Any<CancellationToken>());
     }
-
-    [Fact]
-    public async Task LogoutAllAsync_WhenUserMissing_ReturnsUnauthorized()
-    {
-        // Arrange
-        var command = new LogoutAllCommand(Guid.NewGuid());
-        _userManager.FindByIdAsync(command.UserId.ToString()).Returns((User?)null);
-
-        // Act
-        var result = await _authService.LogoutAllAsync(command, CancellationToken.None);
-
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Equal("auth.logout_all.invalid_user", result.Error.Code);
-    }
-
-    [Fact]
-    public async Task LogoutAllAsync_WhenUserExists_RevokesAllTokens()
-    {
-        // Arrange
-        var user = new User { Id = Guid.NewGuid(), Email = "john@example.com" };
-        var command = new LogoutAllCommand(user.Id);
-
-        _userManager.FindByIdAsync(user.Id.ToString()).Returns(user);
-
-        // Act
-        var result = await _authService.LogoutAllAsync(command, CancellationToken.None);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        await _refreshTokenService.Received(1).RevokeAllAsync(user, Arg.Any<CancellationToken>());
-    }
 }
-
-

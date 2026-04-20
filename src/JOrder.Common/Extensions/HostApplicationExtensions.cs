@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using JOrder.Common.Attributes;
+using JOrder.Common.Helpers;
 using JOrder.Common.Options;
 using JOrder.Common.Options.Interfaces;
 using JOrder.Common.Persistence;
@@ -24,10 +25,10 @@ namespace JOrder.Common.Extensions;
 public static class HostApplicationExtensions
 {
     /// <summary>
-    /// Registers common JOrder infrastructure: service options, logging, memory cache,
-    /// <see cref="TimeProvider"/>, and HTTP context accessor.
+    /// Registers common JOrder infrastructure: service options, logging, memory cache, and
+    /// <see cref="TimeProvider"/>.
     /// When running as a <see cref="Microsoft.AspNetCore.Builder.WebApplicationBuilder"/>,
-    /// also registers controllers and the OpenAPI document with the service name as its title.
+    /// also registers <see cref="IHttpContextAccessor"/>, <see cref="ICurrentUser"/>, controllers, and the OpenAPI document with the service name as its title.
     /// </summary>
     public static IHostApplicationBuilder AddJOrderCommon(this IHostApplicationBuilder builder)
     {
@@ -47,15 +48,14 @@ public static class HostApplicationExtensions
                 options.UseUtcTimestamp = true;
             });
         });
+
         services.AddMemoryCache();
         services.AddSingleton(TimeProvider.System);
-
-        services.AddScoped<ICurrentUser, CurrentUser>();
-
-        services.AddHttpContextAccessor();
         
-        if (builder is Microsoft.AspNetCore.Builder.WebApplicationBuilder)
+        if (builder is WebApplicationBuilder)
         {
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddControllers();
             services.AddJOrderOpenApi(serviceOptions?.Name ?? builder.Environment.ApplicationName);
         }
@@ -315,6 +315,38 @@ public static class HostApplicationExtensions
         if (type.GetCustomAttribute<TransientServiceAttribute>() is not null)  return ServiceLifetime.Transient;
         if (type.GetCustomAttribute<SingletonServiceAttribute>() is not null)  return ServiceLifetime.Singleton;
         return null;
+    }
+
+    /// <summary>
+    /// Registers <see cref="BearerTokenForwardingHandler"/> as a transient service so it can be
+    /// attached to typed <c>HttpClient</c> registrations via <c>.WithBearerForwarding()</c>
+    /// or <c>.AddHttpMessageHandler&lt;BearerTokenForwardingHandler&gt;()</c>:
+    /// <code>
+    /// builder.Services.AddHttpClient&lt;IOrderClient, OrderClient&gt;()
+    ///     .WithBearerForwarding();
+    /// </code>
+    /// </summary>
+    /// <remarks>
+    /// Only supported for <see cref="WebApplicationBuilder"/>. Bearer token forwarding relies on
+    /// <see cref="IHttpContextAccessor"/> to read the incoming request, which is not available in
+    /// worker or console hosts. An <see cref="InvalidOperationException"/> is thrown at startup if
+    /// called from a non-web host builder.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <paramref name="builder"/> is not a <see cref="WebApplicationBuilder"/>.
+    /// </exception>
+    public static IHostApplicationBuilder AddJOrderBearerForwarding(this IHostApplicationBuilder builder)
+    {
+        if (builder is not WebApplicationBuilder)
+            throw new InvalidOperationException(
+                $"{nameof(AddJOrderBearerForwarding)} requires a {nameof(WebApplicationBuilder)}. " +
+                "Bearer token forwarding is only meaningful in a web host where an incoming HTTP request is available.");
+
+        // Ensure IHttpContextAccessor is registered; safe to call multiple times.
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddTransient<BearerTokenForwardingHandler>();
+
+        return builder;
     }
 }
 

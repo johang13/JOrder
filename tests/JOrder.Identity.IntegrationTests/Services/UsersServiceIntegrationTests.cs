@@ -1,4 +1,5 @@
 using JOrder.Common.Abstractions.Results;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.IntegrationTests.TestInfrastructure;
 using JOrder.Identity.Models;
@@ -6,6 +7,7 @@ using JOrder.Identity.Persistence;
 using JOrder.Identity.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -14,6 +16,33 @@ namespace JOrder.Identity.IntegrationTests.Services;
 [Collection(IdentityPostgresIntegrationCollection.Name)]
 public sealed class UsersServiceIntegrationTests(PostgresIntegrationFixture fixture)
 {
+    [Fact]
+    public async Task RegisterAsync_Success_PersistsUserAndRole_WithoutIssuingRefreshToken()
+    {
+        await using var context = await fixture.CreateContextAsync(TimeProvider.System);
+        var (service, userManager) = CreateUsersService(context);
+
+        var command = new RegisterCommand(
+            "John",
+            "Doe",
+            "john.integration@example.com",
+            "Password1!",
+            "127.0.0.1",
+            "IntegrationTests");
+
+        var result = await service.RegisterAsync(command);
+
+        Assert.True(result.IsSuccess);
+
+        var user = await userManager.FindByEmailAsync("john.integration@example.com");
+        Assert.NotNull(user);
+
+        var roles = await userManager.GetRolesAsync(user!);
+        Assert.Contains("Customer", roles);
+
+        Assert.False(await context.RefreshTokens.AnyAsync(rt => rt.UserId == user!.Id));
+    }
+
     [Fact]
     public async Task GetUserProfileAsync_UserMissing_ReturnsNotFound()
     {
@@ -168,7 +197,7 @@ public sealed class UsersServiceIntegrationTests(PostgresIntegrationFixture fixt
     {
         var userStore = new UserStore<User, Role, JOrderIdentityDbContext, Guid>(context);
         var userManager = IdentityIntegrationTestHelpers.CreateUserManager(userStore);
-        var service = new UsersService(userManager, Substitute.For<ILogger<UsersService>>());
+        var service = new UsersService(userManager, context, Substitute.For<ILogger<UsersService>>());
         return (service, userManager);
     }
 }

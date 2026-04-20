@@ -1,4 +1,5 @@
 using JOrder.Common.Abstractions.Results;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Application.Users.Results;
 
@@ -6,6 +7,8 @@ namespace JOrder.Identity.Services.Interfaces;
 
 public interface IUsersService
 {
+    Task<Result> RegisterAsync(RegisterCommand command, CancellationToken cancellationToken = default);
+
     Task<Result<UserProfileResult>> GetUserProfileAsync(UserProfileCommand command,
         CancellationToken cancellationToken = default);
     

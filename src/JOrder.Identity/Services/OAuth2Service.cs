@@ -2,7 +2,6 @@ using JOrder.Common.Abstractions.Results;
 using JOrder.Common.Attributes;
 using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Auth.Results;
-using JOrder.Identity.Extensions;
 using JOrder.Identity.Models;
 using JOrder.Identity.Persistence;
 using JOrder.Identity.Services.Interfaces;
@@ -11,75 +10,14 @@ using Microsoft.AspNetCore.Identity;
 namespace JOrder.Identity.Services;
 
 [ScopedService]
-public sealed class AuthService(
+public sealed class OAuth2Service(
     UserManager<User> userManager,
     ITokenMintingService tokenMintingService,
     IRefreshTokenService refreshTokenService,
     JOrderIdentityDbContext dbContext,
     TimeProvider timeProvider,
-    ILogger<AuthService> logger) : IAuthService
+    ILogger<OAuth2Service> logger) : IOAuth2Service
 {
-    public async Task<Result<AuthTokenResult>> RegisterAsync(RegisterCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        logger.LogInformation("Registering user: {Email}", command.Email);
-
-        if (await userManager.FindByEmailAsync(command.Email) is not null)
-        {
-            logger.LogInformation("User with email {Email} already exists", command.Email);
-            return Error.Conflict("auth.user_exists", "A user with this email already exists.");
-        }
-
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var user = new User
-            {
-                FirstName = command.FirstName,
-                LastName = command.LastName,
-                Email = command.Email,
-                UserName = command.Email,
-            };
-
-            var createResult = await userManager.CreateAsync(user, command.Password);
-            if (!createResult.Succeeded)
-            {
-                logger.LogInformation("User creation failed for user: {Email}", command.Email);
-                return createResult.ToValidationError("auth.register.invalid", "User creation failed.");
-            }
-            
-            logger.LogInformation("User created: {Email}", command.Email);
-
-            var roleResult = await userManager.AddToRoleAsync(user, "Customer");
-            if (!roleResult.Succeeded)
-            {
-                logger.LogInformation("Adding role to user failed for user: {Email}", command.Email);
-                return roleResult.ToValidationError("auth.register.role_assignment_failed", "Failed to assign role to user.");
-            }
-
-            logger.LogInformation("Assigned role 'Customer' to user: {Email}", command.Email);
-
-            var roles = await GetRolesOrError(user);
-            if (roles is null)
-            {
-                logger.LogInformation("No roles assigned for user: {Email}", command.Email);
-                return Error.Validation("auth.register.no_roles", "No roles were assigned to the user.");
-            }
-
-            var tokens = await IssueTokensAsync(user, roles, command.IpAddress, command.UserAgent, cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-
-            return new AuthTokenResult(tokens.AccessToken, tokens.AccessTokenExpiresAt, tokens.RefreshToken, tokens.RefreshTokenExpiresAt);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Registration failed for {Email}, rolling back transaction", command.Email);
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
-
     public async Task<Result<AuthTokenResult>> LoginAsync(LoginCommand command, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Logging in user: {Email}", command.Email);
@@ -139,7 +77,6 @@ public sealed class AuthService(
         if (roles is null)
             return Error.Unauthorized("auth.refresh.no_roles", "User has no assigned roles.");
 
-        // Rotate refresh token and mint new access token
         var (rawRefreshToken, newTokenHash, refreshTokenExpiresAt) = tokenMintingService.MintRefreshToken();
         var (accessToken, accessTokenExpiresAt) = tokenMintingService.MintAccessToken(user, roles);
 
@@ -162,31 +99,14 @@ public sealed class AuthService(
         return new AuthTokenResult(accessToken, accessTokenExpiresAt, rawRefreshToken, refreshTokenExpiresAt);
     }
 
-    public async Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result> RevokeAsync(LogoutCommand command, CancellationToken cancellationToken = default)
     {
         var token = await refreshTokenService.FindByRawTokenAsync(command.RefreshToken, cancellationToken);
         if (token is not null)
             await refreshTokenService.RevokeAsync(token, cancellationToken);
-        
-        return Result.Success();
-    }
 
-    public async Task<Result> LogoutAllAsync(LogoutAllCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await userManager.FindByIdAsync(command.UserId.ToString());
-        if (user is null)
-        {
-            logger.LogError("No user found for user {UserId}", command.UserId);
-            return Error.Unauthorized("auth.logout_all.invalid_user", "Invalid user.");
-        }
-        
-        await refreshTokenService.RevokeAllAsync(user, cancellationToken);
-        
         return Result.Success();
     }
-    
-    #region Helpers
 
     private async Task<(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RefreshToken, DateTimeOffset RefreshTokenExpiresAt)>
         IssueTokensAsync(User user, IReadOnlyCollection<string> roles, string ipAddress, string userAgent,
@@ -211,6 +131,4 @@ public sealed class AuthService(
 
         return roles.ToArray();
     }
-    
-    #endregion
 }

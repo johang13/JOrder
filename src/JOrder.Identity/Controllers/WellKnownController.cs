@@ -4,7 +4,6 @@ using JOrder.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace JOrder.Identity.Controllers;
 
@@ -36,21 +35,11 @@ public class WellKnownController(
         {
             Issuer = signingOptions.Issuer,
             JwksUri = $"{issuer}/.well-known/jwks.json",
-            TokenEndpoint = $"{issuer}/Auth/login",
-            UserInfoEndpoint = $"{issuer}/Users/me",
-            RevocationEndpoint = $"{issuer}/Auth/logout",
-            EndSessionEndpoint = $"{issuer}/Auth/logout-all",
-            IdTokenSigningAlgValuesSupported = [signingOptions.Algorithm],
+            TokenEndpoint = $"{issuer}/oauth2/token",
+            RevocationEndpoint = $"{issuer}/oauth2/revoke",
+            EndSessionEndpoint = $"{issuer}/Session/logout-all",
             GrantTypesSupported = ["password", "refresh_token"],
-            ResponseTypesSupported = ["token"],
-            ScopesSupported = ["openid", "profile", "email", "roles", "offline_access"],
             TokenEndpointAuthMethodsSupported = ["none"],
-            ClaimsSupported =
-            [
-                JwtRegisteredClaimNames.Sub,
-                JwtRegisteredClaimNames.Email,
-                "role",
-            ]
         };
 
         return Ok(response);

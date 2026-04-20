@@ -36,8 +36,6 @@ public class HostApplicationExtensionsUnitTests
         using var provider = builder.Services.BuildServiceProvider();
 
         Assert.NotNull(provider.GetService<TimeProvider>());
-        Assert.NotNull(provider.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>());
-        Assert.NotNull(provider.GetService<ICurrentUser>());
     }
 
     [Fact]
@@ -53,7 +51,9 @@ public class HostApplicationExtensionsUnitTests
         builder.AddJOrderCommon();
 
         using var provider = builder.Services.BuildServiceProvider();
-
+        
+        Assert.NotNull(provider.GetService<ICurrentUser>());
+        Assert.NotNull(provider.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>());
         Assert.Contains(builder.Services, d => d.ServiceType.FullName == "Microsoft.AspNetCore.Mvc.Infrastructure.IActionDescriptorCollectionProvider");
         Assert.Contains(builder.Services, d => d.ServiceType.FullName?.Contains("OpenApi", StringComparison.Ordinal) == true);
     }

@@ -6,7 +6,6 @@ using JOrder.Testing.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
 
@@ -37,6 +36,7 @@ public class WellKnownControllerUnitTests : ApiControllerUnitTestBase
         
         AttachHttpContext(_wellKnownController, userAgent: "JOrder.UnitTests/1.0", remoteIp: "127.0.0.1");
     }
+
     [Fact]
     public void GetOpenIdConfiguration_ReturnsExpectedConfiguration()
     {
@@ -53,23 +53,11 @@ public class WellKnownControllerUnitTests : ApiControllerUnitTestBase
 
         Assert.Equal(configuredIssuer, payload.Issuer);
         Assert.Equal($"{normalizedIssuer}/.well-known/jwks.json", payload.JwksUri);
-        Assert.Equal($"{normalizedIssuer}/Auth/login", payload.TokenEndpoint);
-        Assert.Equal($"{normalizedIssuer}/Users/me", payload.UserInfoEndpoint);
-        Assert.Equal($"{normalizedIssuer}/Auth/logout", payload.RevocationEndpoint);
-        Assert.Equal($"{normalizedIssuer}/Auth/logout-all", payload.EndSessionEndpoint);
-        Assert.Equal(["public"], payload.SubjectTypesSupported);
-        Assert.Equal(["RS256"], payload.IdTokenSigningAlgValuesSupported);
+        Assert.Equal($"{normalizedIssuer}/oauth2/token", payload.TokenEndpoint);
+        Assert.Equal($"{normalizedIssuer}/oauth2/revoke", payload.RevocationEndpoint);
+        Assert.Equal($"{normalizedIssuer}/Session/logout-all", payload.EndSessionEndpoint);
         Assert.Equal(["password", "refresh_token"], payload.GrantTypesSupported);
-        Assert.Equal(["token"], payload.ResponseTypesSupported);
-        Assert.Equal(["openid", "profile", "email", "roles", "offline_access"], payload.ScopesSupported);
         Assert.Equal(["none"], payload.TokenEndpointAuthMethodsSupported);
-        Assert.Equal(
-            [
-                JwtRegisteredClaimNames.Sub,
-                JwtRegisteredClaimNames.Email,
-                "role"
-            ],
-            payload.ClaimsSupported);
     }
 
     [Fact]
@@ -93,8 +81,7 @@ public class WellKnownControllerUnitTests : ApiControllerUnitTestBase
 
         Assert.Equal(configuredIssuer, payload.Issuer);
         Assert.Equal($"{normalizedIssuer}/.well-known/jwks.json", payload.JwksUri);
-        Assert.Equal($"{normalizedIssuer}/Auth/login", payload.TokenEndpoint);
-        Assert.Equal(["ES256"], payload.IdTokenSigningAlgValuesSupported);
+        Assert.Equal($"{normalizedIssuer}/oauth2/token", payload.TokenEndpoint);
     }
 
     [Fact]

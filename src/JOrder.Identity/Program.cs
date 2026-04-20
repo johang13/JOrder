@@ -12,23 +12,18 @@ var builder = WebApplication.CreateBuilder(args);
 // Add logging, memory cache, TimeProvider, HttpContextAccessor, controllers, and OpenAPI
 builder.AddJOrderCommon();
 
-// Global per-IP rate limiting driven by [RateLimit] endpoint attributes
+// Add other API middleware
+builder.AddJOrderBearerForwarding();
 builder.AddJOrderRateLimiting();
 
-// Bind, validate, and register JwtSigningOptions from configuration
+// Add JOrder Identity specific services
 builder.AddJOrderOptions<JwtSigningOptions>();
-
-// Scan assembly and register classes marked with [ScopedService], [TransientService], or [SingletonService]
 builder.AddJOrderServicesFromAssembly(typeof(Program).Assembly);
-
-// Register warmup task to run before the app starts accepting requests
-builder.AddJOrderWarmupTask<SigningKeyMaterialServiceWarmup>();
-
-// Add database
 builder.AddJOrderDatabase<JOrderIdentityDbContext>((_, options, dbOptions) =>
     options.UseNpgsql(dbOptions.ConnectionString));
 
-// Add ASP.NET Identity
+builder.AddJOrderWarmupTask<SigningKeyMaterialServiceWarmup>();
+
 builder.Services
     .AddIdentityCore<User>(options =>
     {
@@ -40,6 +35,7 @@ builder.Services
     .AddEntityFrameworkStores<JOrderIdentityDbContext>();
 
 // Self-validate JWTs issued by this service (static key — no OIDC discovery needed)
+// Need to load the signing key material before building the app to ensure it's available for authentication middleware
 var signingConfig = builder.Configuration
     .GetSection(JwtSigningOptions.SectionName)
     .Get<JwtSigningOptions>();
@@ -63,10 +59,8 @@ rsa.ImportFromPem(System.IO.File.ReadAllText(privateKeyPath));
 var publicKey = new RsaSecurityKey(rsa.ExportParameters(false));
 builder.AddJOrderJwtIssuerAuthentication(signingConfig.Issuer, signingConfig.Audience, publicKey);
 
-// Build
+// Build and run warmup tasks
 await using var app = builder.Build();
-
-// Execute all registered warmup tasks sequentially before accepting traffic
 await app.RunWarmupTasksAsync();
 
 // Configure middleware pipeline: HTTPS redirection, auth (if registered), and controller routing

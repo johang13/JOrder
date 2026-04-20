@@ -1,4 +1,6 @@
+using JOrder.Common.Attributes;
 using JOrder.Common.Extensions;
+using JOrder.Identity.Application.Auth.Commands;
 using JOrder.Identity.Application.Users.Commands;
 using JOrder.Identity.Contracts.Requests;
 using JOrder.Identity.Contracts.Responses;
@@ -12,6 +14,40 @@ namespace JOrder.Identity.Controllers;
 [Route("[controller]")]
 public class UsersController(IUsersService usersService) : ControllerBase
 {
+    /// <summary>
+    /// Registers a new user account.
+    /// </summary>
+    /// <response code="201">Registration succeeded.</response>
+    /// <response code="400">The request payload is invalid.</response>
+    /// <response code="409">A user with the same email already exists.</response>
+    /// <response code="429">Too many requests in a short time window.</response>
+    /// <response code="500">An unexpected server error occurred.</response>
+    [HttpPost]
+    [AllowAnonymous]
+    [RateLimit(permitLimit: 10, windowSeconds: 60)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+    {
+        var command = new RegisterCommand(
+            request.FirstName,
+            request.LastName,
+            request.Email,
+            request.Password,
+            GetIpAddress(),
+            GetUserAgent());
+
+        var result = await usersService.RegisterAsync(command, HttpContext.RequestAborted);
+
+        if (result.IsFailure)
+            return this.ToActionResult(result.Error);
+
+        return StatusCode(StatusCodes.Status201Created);
+    }
+
     /// <summary>
     /// Gets the profile of the currently authenticated user.
     /// </summary>
@@ -124,4 +160,10 @@ public class UsersController(IUsersService usersService) : ControllerBase
         
         return NoContent();
     }
+
+    private string GetIpAddress() =>
+        HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private string GetUserAgent() =>
+        Request.Headers.UserAgent.ToString();
 }
