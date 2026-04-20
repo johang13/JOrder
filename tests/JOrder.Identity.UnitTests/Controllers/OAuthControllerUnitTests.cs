@@ -72,7 +72,7 @@ public class OAuthControllerUnitTests : ApiControllerUnitTestBase
         var result = await _oauthController.Token(request);
 
         var unauthorized = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+        Assert.Equal(StatusCodes.Status400BadRequest, unauthorized.StatusCode);
         var error = Assert.IsType<OAuthErrorResponseDto>(unauthorized.Value);
         Assert.Equal("invalid_grant", error.Error);
     }
