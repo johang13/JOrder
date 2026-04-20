@@ -15,10 +15,11 @@ public sealed class BearerTokenForwardingHandler(IHttpContextAccessor httpContex
     {
         var authHeader = httpContextAccessor.HttpContext?.Request.Headers.Authorization.FirstOrDefault();
 
-        if (!string.IsNullOrEmpty(authHeader) && !request.Headers.Contains("Authorization"))
+        if (!string.IsNullOrEmpty(authHeader)
+            && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            && !request.Headers.Contains("Authorization"))
             request.Headers.TryAddWithoutValidation("Authorization", authHeader);
 
         return base.SendAsync(request, cancellationToken);
     }
 }
-

@@ -133,11 +133,30 @@ Behavior:
 - Task execution is timed and logged per task.
 - The cancellation token passed to `RunWarmupTasksAsync()` is forwarded to each task.
 
+## EF Core Auditing
+
+`AuditableInterceptor` is an EF Core `SaveChangesInterceptor` that automatically stamps audit fields before each save.
+
+It is registered automatically by `AddJOrderDatabase<TDbContext>(...)` — no manual setup is needed.
+
+**On `Added` entities:**
+
+- `CreatedAt` is set to `TimeProvider.GetUtcNow()`
+- `CreatedById` is set to `ICurrentUser.Id`
+- `CreatedBy` is set to the current user's email, or the service name if the request is unauthenticated
+
+**On `Modified` entities:**
+
+- `UpdatedAt`, `UpdatedById`, and `UpdatedBy` are set using the same logic
+- `CreatedAt`, `CreatedBy`, and `CreatedById` are protected — EF Core is prevented from overwriting them
+
+Entities must implement `IAuditable` (via `AuditableEntity`) to be tracked. Plain `Entity` subclasses are ignored by the interceptor.
+
 ## Common Extension Methods
 
 From `HostApplicationExtensions`:
 
-- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, and web-only services (`HttpContextAccessor`, controllers, OpenAPI)
+- `AddJOrderCommon()` - registers logging, cache, `TimeProvider`, `ICurrentUser`, and web-only services (`HttpContextAccessor`, controllers, OpenAPI, `ICurrentUser`)
 - `AddJOrderBearerForwarding()` - registers `BearerTokenForwardingHandler` for outbound token propagation
 - `AddJOrderRateLimiting()` - enables global per-IP rate limiting driven by `[RateLimit]`
 - `AddJOrderOptions<TOptions>()` - binds and validates options on startup

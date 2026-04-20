@@ -14,108 +14,8 @@ using NSubstitute;
 namespace JOrder.Identity.IntegrationTests.Services;
 
 [Collection(IdentityPostgresIntegrationCollection.Name)]
-public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixture)
+public sealed class OAuth2ServiceIntegrationTests(PostgresIntegrationFixture fixture)
 {
-    [Fact]
-    public async Task RegisterAsync_Success_PersistsUserAndRole_WithoutIssuingRefreshToken()
-    {
-        await using var context = await fixture.CreateContextAsync(TimeProvider.System);
-
-        var userStore = new UserStore<User, Role, JOrderIdentityDbContext, Guid>(context);
-        var userManager = IdentityIntegrationTestHelpers.CreateUserManager(userStore);
-
-        var tokenMintingService = Substitute.For<ITokenMintingService>();
-        var now = DateTimeOffset.UtcNow;
-        tokenMintingService.MintAccessToken(Arg.Any<User>(), Arg.Any<IReadOnlyCollection<string>>())
-            .Returns(("access-token", now.AddMinutes(15)));
-        tokenMintingService.MintRefreshToken()
-            .Returns(("raw-refresh", "refresh-hash", now.AddDays(7)));
-
-        var service = new UsersService(
-            userManager,
-            context,
-            Substitute.For<ILogger<UsersService>>());
-
-        var command = new RegisterCommand(
-            "John",
-            "Doe",
-            "john.integration@example.com",
-            "Password1!",
-            "127.0.0.1",
-            "IntegrationTests");
-
-        var result = await service.RegisterAsync(command);
-
-        Assert.True(result.IsSuccess);
-
-        var user = await userManager.FindByEmailAsync("john.integration@example.com");
-        Assert.NotNull(user);
-
-        var roles = await userManager.GetRolesAsync(user!);
-        Assert.Contains("Customer", roles);
-
-        Assert.False(await context.RefreshTokens.AnyAsync(rt => rt.UserId == user!.Id));
-    }
-
-    [Fact]
-    public async Task LogoutAllAsync_Success_RevokesActiveTokensForUser()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var fixedTimeProvider = new FixedTimeProvider(now);
-
-        await using var context = await fixture.CreateContextAsync(fixedTimeProvider);
-
-        var userStore = new UserStore<User, Role, JOrderIdentityDbContext, Guid>(context);
-        var userManager = IdentityIntegrationTestHelpers.CreateUserManager(userStore);
-
-        var user = PostgresIntegrationFixture.CreateUser("logout-all@example.com");
-        var createResult = await userManager.CreateAsync(user, "Password1!");
-        Assert.True(createResult.Succeeded);
-
-        context.RefreshTokens.AddRange(
-            new RefreshToken
-            {
-                UserId = user.Id,
-                TokenHash = "active",
-                ExpiresAt = now.AddHours(2),
-                CreatedByIp = "127.0.0.1",
-                UserAgent = "IntegrationTests"
-            },
-            new RefreshToken
-            {
-                UserId = user.Id,
-                TokenHash = "expired",
-                ExpiresAt = now.AddHours(-2),
-                CreatedByIp = "127.0.0.1",
-                UserAgent = "IntegrationTests"
-            });
-        await context.SaveChangesAsync();
-
-        var tokenMintingService = Substitute.For<ITokenMintingService>();
-        var refreshTokenService = new RefreshTokenService(context, tokenMintingService, fixedTimeProvider);
-
-        var service = new SessionService(
-            userManager,
-            refreshTokenService,
-            Substitute.For<ILogger<SessionService>>());
-
-        var result = await service.LogoutAllAsync(new LogoutAllCommand(user.Id));
-
-        Assert.True(result.IsSuccess);
-
-        var tokens = context.RefreshTokens
-            .AsNoTracking()
-            .Where(t => t.UserId == user.Id)
-            .OrderBy(t => t.TokenHash)
-            .ToArray();
-        var active = tokens.Single(t => t.TokenHash == "active");
-        var expired = tokens.Single(t => t.TokenHash == "expired");
-
-        Assert.True(active.IsRevoked);
-        Assert.NotNull(active.ReplacedAt);
-        Assert.False(expired.IsRevoked);
-    }
-
     [Fact]
     public async Task LoginAsync_Success_PersistsRefreshTokenAndReturnsTokens()
     {
@@ -317,11 +217,5 @@ public sealed class AuthServiceIntegrationTests(PostgresIntegrationFixture fixtu
             timeProvider,
             Substitute.For<ILogger<OAuth2Service>>());
     }
-
 }
-
-
-
-
-
 

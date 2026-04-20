@@ -28,7 +28,7 @@ public static class HostApplicationExtensions
     /// Registers common JOrder infrastructure: service options, logging, memory cache,
     /// <see cref="TimeProvider"/>, and HTTP context accessor.
     /// When running as a <see cref="Microsoft.AspNetCore.Builder.WebApplicationBuilder"/>,
-    /// also registers controllers and the OpenAPI document with the service name as its title.
+    /// also registers <see cref="IHttpContextAccessor"/>, <see cref="ICurrentUser"/>, controllers, and the OpenAPI document with the service name as its title.
     /// </summary>
     public static IHostApplicationBuilder AddJOrderCommon(this IHostApplicationBuilder builder)
     {
@@ -48,14 +48,14 @@ public static class HostApplicationExtensions
                 options.UseUtcTimestamp = true;
             });
         });
+
         services.AddMemoryCache();
         services.AddSingleton(TimeProvider.System);
-
-        services.AddScoped<ICurrentUser, CurrentUser>();
         
         if (builder is WebApplicationBuilder)
         {
             services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddControllers();
             services.AddJOrderOpenApi(serviceOptions?.Name ?? builder.Environment.ApplicationName);
         }
@@ -324,8 +324,7 @@ public static class HostApplicationExtensions
     /// builder.Services.AddHttpClient&lt;IOrderClient, OrderClient&gt;()
     ///     .AddHttpMessageHandler&lt;BearerTokenForwardingHandler&gt;();
     /// </code>
-    /// <c>IHttpContextAccessor</c> is registered automatically by <see cref="AddJOrderCommon"/>;
-    /// this method does not need to be called separately when that method is used.
+    /// <c>IHttpContextAccessor</c> is registered automatically by <see cref="AddJOrderCommon"/>.
     /// </summary>
     public static IHostApplicationBuilder AddJOrderBearerForwarding(this IHostApplicationBuilder builder)
     {
