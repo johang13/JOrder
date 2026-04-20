@@ -3,10 +3,28 @@ run-name: Build and Test for ${{ github.event_name }} on ${{ github.ref_name }}
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'JOrder.slnx'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'JOrder.slnx'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
 
 jobs:
   build-and-test:
@@ -29,115 +47,98 @@ jobs:
       - name: Build the project
         run: dotnet build --no-restore --configuration Release
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
           rm -rf ./test-results
-          dotnet test --no-build --configuration Release --verbosity normal --results-directory ./test-results --logger "trx" --collect:"XPlat Code Coverage"
+          mapfile -t unit_projects < <(find tests -type f -name '*UnitTests.csproj' | sort)
 
+          if [ ${#unit_projects[@]} -eq 0 ]; then
+            echo "No unit test projects found."
+            exit 1
+          fi
 
-      - name: Generate test summary
+          for project in "${unit_projects[@]}"; do
+            echo "Running unit tests: $project"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --verbosity normal \
+              --results-directory ./test-results/unit \
+              --logger "trx" \
+              --collect:"XPlat Code Coverage"
+          done
+
+      - name: Run integration tests
+        run: |
+          mapfile -t integration_projects < <(find tests -type f -name '*IntegrationTests.csproj' | sort)
+
+          if [ ${#integration_projects[@]} -eq 0 ]; then
+            echo "No integration test projects found."
+            exit 1
+          fi
+
+          for project in "${integration_projects[@]}"; do
+            echo "Running integration tests: $project"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --verbosity normal \
+              --results-directory ./test-results/integration \
+              --logger "trx" \
+              --collect:"XPlat Code Coverage"
+          done
+
+      - name: Publish test results
+        id: test_report
+        if: always()
+        uses: dorny/test-reporter@v3.0.0
+        with:
+          name: Test Results
+          path: ./test-results/**/*.trx
+          reporter: dotnet-trx
+          use-actions-summary: true
+          report-title: Test Results
+          fail-on-empty: false
+          fail-on-error: false
+
+      - name: Detect coverage files
+        id: detect_coverage
         if: always()
         run: |
-          python3 << 'EOF'
-          import xml.etree.ElementTree as ET
-          import glob
-          import os
+          mapfile -t coverage_files < <(find ./test-results -type f -name 'coverage.cobertura.xml' | sort)
+          if [ ${#coverage_files[@]} -eq 0 ]; then
+            echo "HAS_COVERAGE=false" >> "$GITHUB_ENV"
+            echo "has_coverage=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "HAS_COVERAGE=true" >> "$GITHUB_ENV"
+            echo "has_coverage=true" >> "$GITHUB_OUTPUT"
+          fi
 
-          ns = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
-          lines = [
-              "## Test Results\n",
-              "\n",
-              "| Project | Tests | Passed |\n",
-              "| ------- | :---: | :----: |\n",
-          ]
+      - name: Generate merged coverage report
+        if: always() && steps.detect_coverage.outputs.has_coverage == 'true'
+        uses: danielpalme/ReportGenerator-GitHub-Action@5
+        with:
+          reports: ./test-results/**/coverage.cobertura.xml
+          targetdir: ./test-results/coverage-report
+          reporttypes: MarkdownSummaryGithub;TextSummary
+          assemblyfilters: +JOrder.*;-*.UnitTests;-*.IntegrationTests;-JOrder.Testing
+          classfilters: +JOrder.*;-Program;-*.Program;-*.Migrations.*
 
-          for trx_file in sorted(glob.glob('./test-results/**/*.trx', recursive=True)):
-              tree = ET.parse(trx_file)
-              root = tree.getroot()
-              first_test = root.find('.//t:UnitTest', ns)
-              if first_test is not None:
-                  storage = first_test.get('storage', '')
-                  project = os.path.splitext(os.path.basename(storage))[0]
-              else:
-                  dir_name = os.path.basename(os.path.dirname(trx_file))
-                  project = dir_name.split('_')[0] if '_' in dir_name else dir_name
-              counters = root.find('.//t:Counters', ns)
-              if counters is not None:
-                  total  = int(counters.get('total',  0))
-                  failed = int(counters.get('failed', 0))
-                  badge  = '✅' if failed == 0 else '❌'
-                  lines.append(f'| {project} | {total} | {badge} |\n')
-
-          summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
-          with open(summary_path, 'a') as f:
-              f.writelines(lines)
-          EOF
-
-      - name: Generate coverage summary
+      - name: Append coverage summary
         if: always()
         run: |
-          python3 << 'EOF'
-          import xml.etree.ElementTree as ET
-          import glob
-          import os
-          from collections import defaultdict
+          if [ "${HAS_COVERAGE}" != "true" ]; then
+            echo "## Code Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "No coverage files were produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
-          # project -> namespace -> (lines_covered, lines_valid, branches_covered, branches_valid)
-          projects = defaultdict(lambda: defaultdict(lambda: (0, 0, 0, 0)))
-
-          for cov_file in sorted(glob.glob('./test-results/**/coverage.cobertura.xml', recursive=True)):
-              tree = ET.parse(cov_file)
-              root = tree.getroot()
-              for pkg in root.findall('.//package'):
-                  project = pkg.get('name', 'Unknown')
-                  for cls in pkg.findall('.//class'):
-                      ns = cls.get('name', 'Unknown')
-                      ns = ns.rsplit('.', 1)[0] if '.' in ns else ns
-                      if not ns.startswith('JOrder.'):
-                          continue
-
-                      prev = projects[project][ns]
-                      lc = lv = bc = bv = 0
-                      for line in cls.findall('.//line'):
-                          lv += 1
-                          if int(line.get('hits', 0)) > 0:
-                              lc += 1
-                          if line.get('branch') == 'True':
-                              cc = line.get('condition-coverage', '')
-                              if '(' in cc:
-                                  parts = cc.split('(')[1].rstrip(')').split('/')
-                                  bc += int(parts[0])
-                                  bv += int(parts[1])
-
-                      projects[project][ns] = (
-                          prev[0] + lc, prev[1] + lv,
-                          prev[2] + bc, prev[3] + bv,
-                      )
-
-          def pct(n, d):
-              return f'{n / d * 100:.1f}%' if d else '—'
-
-          lines = ["\n## Code Coverage\n\n"]
-          total_lc = total_lv = total_bc = total_bv = 0
-
-          for project in sorted(projects):
-              lines.append(f'### {project}\n\n')
-              lines.append('| Namespace | Line | Branch |\n')
-              lines.append('| --------- | ---: | -----: |\n')
-              p_lc = p_lv = p_bc = p_bv = 0
-              for ns in sorted(projects[project]):
-                  lc, lv, bc, bv = projects[project][ns]
-                  p_lc += lc; p_lv += lv; p_bc += bc; p_bv += bv
-                  lines.append(f'| {ns} | {pct(lc, lv)} | {pct(bc, bv)} |\n')
-              lines.append(f'| **Subtotal** | **{pct(p_lc, p_lv)}** | **{pct(p_bc, p_bv)}** |\n\n')
-              total_lc += p_lc; total_lv += p_lv; total_bc += p_bc; total_bv += p_bv
-
-          lines.append(f'**Overall: {pct(total_lc, total_lv)} line · {pct(total_bc, total_bv)} branch**\n')
-
-          summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout')
-          with open(summary_path, 'a') as f:
-              f.writelines(lines)
-          EOF
+          if [ -f ./test-results/coverage-report/SummaryGithub.md ]; then
+            cat ./test-results/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Code Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "Coverage report was generated, but markdown summary file was not found." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload test results
         if: always()
@@ -145,3 +146,10 @@ jobs:
         with:
           name: test-results
           path: ./test-results
+
+      - name: Upload merged coverage report
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: coverage-report
+          path: ./test-results/coverage-report

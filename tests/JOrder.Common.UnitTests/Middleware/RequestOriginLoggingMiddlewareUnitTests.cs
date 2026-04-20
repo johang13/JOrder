@@ -8,9 +8,9 @@ namespace JOrder.Common.UnitTests.Middleware;
 
 public class RequestOriginLoggingMiddlewareUnitTests
 {
-    private readonly ILogger<RequestOriginLoggingMiddlewareUnit> _logger = Substitute.For<ILogger<RequestOriginLoggingMiddlewareUnit>>();
+    private readonly ILogger<RequestOriginLoggingMiddleware> _logger = Substitute.For<ILogger<RequestOriginLoggingMiddleware>>();
 
-    private RequestOriginLoggingMiddlewareUnit CreateMiddleware(RequestDelegate next)
+    private RequestOriginLoggingMiddleware CreateMiddleware(RequestDelegate next)
         => new(next, _logger);
 
     private static DefaultHttpContext CreateHttpContext(string method = "GET", string path = "/api/test")

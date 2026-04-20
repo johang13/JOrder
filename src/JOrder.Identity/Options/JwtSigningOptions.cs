@@ -5,7 +5,7 @@ namespace JOrder.Identity.Options;
 
 public sealed class JwtSigningOptions : IJOrderOptions
 {
-    public static string SectionName => "Authentication:JwtSigning";
+    public static string SectionName => "JOrder:Authentication:JwtSigning";
 
     [Required]
     public string PrivateKeyPath { get; set; } = string.Empty;

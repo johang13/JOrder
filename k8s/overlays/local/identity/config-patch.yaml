@@ -4,7 +4,7 @@ metadata:
   name: identity-config
   namespace: jorder
 data:
-  Authentication__JwtSigning__Issuer: "http://identity.jorder.localhost"
-  Authentication__JwtSigning__Audience: "jorder-api"
+  JOrder__Authentication__JwtSigning__Issuer: "http://identity.jorder.localhost"
+  JOrder__Authentication__JwtSigning__Audience: "jorder-api"
   ASPNETCORE_ENVIRONMENT: "Development"
 
